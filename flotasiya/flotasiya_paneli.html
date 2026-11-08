@@ -1,0 +1,652 @@
+<title>Flotasiya Tail Paneli</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans:wdth,wght@62.5..100,400..800&display=swap">
+<style>
+/* Layout: plant control-room console — copper accent on cool slate, sticky header + tabs, dense data tables, numbers in mono */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --panel-2:#f6f8fa; --line:#d5dce3; --ink:#18232e; --muted:#5b6b7a;
+  --copper:#b05a2a; --copper-soft:#f6e6dc; --navy:#1d3346; --input:#fff8e8; --input-line:#e6cf9a; --input-ink:#1a4fb5;
+  --good:#1f7a45; --good-bg:#dcf2e4; --info:#1f5d8f; --info-bg:#dceaf6; --warn:#946200; --warn-bg:#fbefc9; --bad:#b0262b; --bad-bg:#fadcdc;
+  --band:#c9e3d2; --chart-grid:#e2e7ec;
+  --f-display:"Noto Sans",system-ui,sans-serif; --f-body:"Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f161d; --panel:#16202a; --panel-2:#1b2733; --line:#2b3a48; --ink:#e3e9ef; --muted:#93a3b2;
+  --copper:#e08a52; --copper-soft:#3a271c; --navy:#0b1520; --input:#262217; --input-line:#5a4c28; --input-ink:#8db8ff;
+  --good:#5fcf8c; --good-bg:#173527; --info:#7db8ea; --info-bg:#172c3f; --warn:#e8bd4f; --warn-bg:#3a3018; --bad:#ff8b8b; --bad-bg:#401d20;
+  --band:#1f4a32; --chart-grid:#25323e; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f161d; --panel:#16202a; --panel-2:#1b2733; --line:#2b3a48; --ink:#e3e9ef; --muted:#93a3b2;
+  --copper:#e08a52; --copper-soft:#3a271c; --navy:#0b1520; --input:#262217; --input-line:#5a4c28; --input-ink:#8db8ff;
+  --good:#5fcf8c; --good-bg:#173527; --info:#7db8ea; --info-bg:#172c3f; --warn:#e8bd4f; --warn-bg:#3a3018; --bad:#ff8b8b; --bad-bg:#401d20;
+  --band:#1f4a32; --chart-grid:#25323e; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--navy)}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--navy);color:#e9eff5;border-bottom:3px solid var(--copper)}
+header.top .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;padding-block:10px 0}
+.brand{display:flex;align-items:baseline;gap:10px;flex:1 1 auto;min-width:0}
+.brand h1{font-family:var(--f-display);font-stretch:75%;font-weight:750;font-size:22px;letter-spacing:.01em;margin:0;text-wrap:balance}
+.brand .cu{font-family:var(--f-mono);font-size:12px;color:#f0b48c;border:1px solid #f0b48c66;padding:1px 6px;border-radius:3px}
+.store{font-size:12px;display:flex;align-items:center;gap:6px;color:#c3cfdb}
+.dot{width:8px;height:8px;border-radius:50%;background:#8a99a8}
+.dot.ok{background:#4cd486}.dot.loc{background:#f0b48c}.dot.err{background:#ff6b6b}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;width:100%;scrollbar-width:none}
+nav.tabs button{font-family:var(--f-display);font-stretch:80%;font-weight:650;font-size:15px;letter-spacing:.02em;background:none;border:0;color:#b6c4d2;padding:9px 14px 10px;cursor:pointer;border-radius:6px 6px 0 0;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{background:var(--bg);color:var(--ink)}
+nav.tabs button:focus-visible{outline:2px solid var(--copper);outline-offset:-2px}
+main{padding-block:20px 48px}
+section.view{display:grid;gap:18px}
+h2{font-family:var(--f-display);font-stretch:78%;font-weight:720;font-size:20px;margin:0;letter-spacing:.01em;text-wrap:balance}
+h3{font-family:var(--f-display);font-stretch:85%;font-weight:680;font-size:15px;margin:0;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;gap:14px;min-width:0}
+.cols{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.cols{grid-template-columns:minmax(0,1fr)}}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px 12px}
+.field{display:grid;gap:3px;min-width:0}
+.field label{font-size:12px;color:var(--muted);font-weight:500}
+.field label b{font-weight:600;color:var(--ink)}
+.field .u{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+input,select,textarea{font:inherit;color:var(--input-ink);background:var(--input);border:1px solid var(--input-line);border-radius:5px;padding:6px 8px;width:100%;min-width:0}
+input.num{font-family:var(--f-mono);font-weight:600;text-align:right}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--copper);outline-offset:0;border-color:transparent}
+.field.req label b::after{content:" *";color:var(--copper)}
+.wide{grid-column:1/-1}
+.btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button.b{font:inherit;font-weight:600;border-radius:6px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--panel-2);color:var(--ink)}
+button.b.pri{background:var(--copper);border-color:var(--copper);color:#fff}
+button.b.danger{color:var(--bad);border-color:var(--bad)}
+button.b.sm{padding:4px 9px;font-size:12px}
+button.b:disabled{opacity:.5;cursor:not-allowed}
+button.b:focus-visible{outline:2px solid var(--copper);outline-offset:2px}
+.msg{font-size:13px;color:var(--muted)}
+.msg.ok{color:var(--good)}.msg.err{color:var(--bad)}
+.kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.kv>div{padding:6px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center}
+.kv>div:nth-last-child(-n+2){border-bottom:0}
+.kv .k{font-size:13px;display:block}.kv .k small{display:block;color:var(--muted);font-size:11px;font-family:var(--f-mono)}
+.kv .v{font-family:var(--f-mono);font-weight:600;justify-content:flex-end;background:var(--panel-2);font-variant-numeric:tabular-nums;min-width:92px}
+.kv .hl{background:var(--copper-soft)}
+.verdict{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;border-radius:8px;padding:14px 16px;border:1px solid var(--line)}
+.verdict .big{font-family:var(--f-display);font-stretch:70%;font-weight:800;font-size:34px;line-height:1;letter-spacing:.02em}
+.verdict p{margin:0;font-size:13px}
+.s-ELA{background:var(--good-bg);color:var(--good)}.s-NORMAL{background:var(--info-bg);color:var(--info)}
+.s-DIQQET{background:var(--warn-bg);color:var(--warn)}.s-PIS{background:var(--bad-bg);color:var(--bad)}.s-NONE{background:var(--panel-2);color:var(--muted)}
+.verdict.s-ELA,.verdict.s-NORMAL,.verdict.s-DIQQET,.verdict.s-PIS{border-color:transparent}
+.verdict p{color:var(--ink)}
+.band{position:relative;height:30px;margin-top:4px}
+.band .track{position:absolute;inset:12px 0 auto;height:6px;border-radius:3px;background:var(--panel-2);border:1px solid var(--line)}
+.band .zone{position:absolute;top:10px;height:10px;background:var(--band);border-radius:2px}
+.band .mark{position:absolute;top:4px;width:3px;height:22px;background:var(--bad);border-radius:1px}
+.band .lbl{position:absolute;top:-2px;font-family:var(--f-mono);font-size:10px;color:var(--muted);transform:translateX(-50%)}
+.pill{display:inline-block;font-family:var(--f-display);font-stretch:80%;font-weight:700;font-size:12px;letter-spacing:.04em;padding:2px 8px;border-radius:10px;white-space:nowrap}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:2px}
+.tile .t{font-size:12px;color:var(--muted)}
+.tile .n{font-family:var(--f-mono);font-weight:600;font-size:22px;font-variant-numeric:tabular-nums}
+.tile .s{font-size:12px;color:var(--muted)}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-family:var(--f-display);font-stretch:85%;font-weight:650;font-size:12px;color:var(--muted);background:var(--panel-2);position:sticky;top:0;text-align:right;vertical-align:bottom;line-height:1.2}
+th.l,td.l{text-align:left}
+td{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+td.note{font-family:var(--f-body);white-space:normal;min-width:220px;max-width:340px;text-align:left;color:var(--muted)}
+td.flag{color:var(--bad);font-weight:700}
+tr.editing td{background:var(--copper-soft)}
+tbody tr:hover td{background:var(--panel-2)}
+.empty{padding:28px 18px;text-align:center;color:var(--muted);display:grid;gap:8px;justify-items:center}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-family:var(--f-mono);font-size:11px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.doc{max-width:78ch;display:grid;gap:10px}
+.doc p,.doc li{margin:0}
+.doc ul,.doc ol{margin:0;padding-left:20px;display:grid;gap:6px}
+code,.mono{font-family:var(--f-mono);font-size:12.5px}
+.formula{font-family:var(--f-mono);font-size:12.5px;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:10px 12px;overflow-x:auto;white-space:pre}
+.chip{font-size:11px;border:1px solid var(--line);border-radius:10px;padding:1px 8px;color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.confirm{display:inline-flex;gap:6px;align-items:center;font-family:var(--f-body);font-size:12px}
+@media (prefers-reduced-motion:no-preference){button.b{transition:filter .15s}button.b:hover{filter:brightness(1.06)}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><h1>Flotasiya Tail Paneli</h1><span class="cu">Cu · AIMC Agdere</span></div>
+    <div class="store" id="storeState"><span class="dot" id="storeDot"></span><span id="storeText">Yaddaş yoxlanılır…</span></div>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-v="calc" aria-selected="true">Kalkulyator</button>
+      <button role="tab" data-v="log" aria-selected="false">Gündəlik</button>
+      <button role="tab" data-v="trend" aria-selected="false">Trend</button>
+      <button role="tab" data-v="dose" aria-selected="false">Doza</button>
+      <button role="tab" data-v="help" aria-selected="false">Təlimat</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ============ KALKULYATOR ============ -->
+<section class="view" id="v-calc">
+  <div class="cols">
+    <div class="panel">
+      <div class="row"><h2 id="calcTitle">Yeni analiz dəsti</h2><span class="chip" id="editChip" hidden>Redaktə</span></div>
+      <div class="form" id="calcForm">
+        <div class="field req"><label for="f-date"><b>Tarix</b></label><input id="f-date" type="date"></div>
+        <div class="field"><label for="f-time"><b>Saat</b></label><input id="f-time" type="time"></div>
+        <div class="field"><label for="f-tph"><b>Tonaj</b> <span class="u">t/saat</span></label><input id="f-tph" class="num" inputmode="decimal"></div>
+        <div class="field req"><label for="f-feedCu"><b>Feed Cu</b> <span class="u">%</span></label><input id="f-feedCu" class="num" inputmode="decimal"></div>
+        <div class="field"><label for="f-feedCuOx"><b>Feed CuOx</b> <span class="u">%</span></label><input id="f-feedCuOx" class="num" inputmode="decimal"></div>
+        <div class="field req"><label for="f-tailCu"><b>Total tail Cu</b> <span class="u">%</span></label><input id="f-tailCu" class="num" inputmode="decimal"></div>
+        <div class="field"><label for="f-tailCuOx"><b>Tail CuOx</b> <span class="u">%</span></label><input id="f-tailCuOx" class="num" inputmode="decimal"></div>
+        <div class="field"><label for="f-clScav"><b>Cl. scav tail Cu</b> <span class="u">%</span></label><input id="f-clScav" class="num" inputmode="decimal"></div>
+        <div class="field req"><label for="f-concCu"><b>Conc Cu</b> <span class="u">%</span></label><input id="f-concCu" class="num" inputmode="decimal"></div>
+        <div class="field"><label for="f-concS"><b>Conc S</b> <span class="u">%</span></label><input id="f-concS" class="num" inputmode="decimal"></div>
+        <div class="field"><label for="f-concFe"><b>Conc Fe</b> <span class="u">%</span></label><input id="f-concFe" class="num" inputmode="decimal"></div>
+        <div class="field"><label for="f-concSi"><b>Conc Si</b> <span class="u">%</span></label><input id="f-concSi" class="num" inputmode="decimal"></div>
+        <div class="field"><label for="f-pH"><b>Rougher pH</b></label><input id="f-pH" class="num" inputmode="decimal"></div>
+        <div class="field"><label for="f-want"><b>İstənilən tail</b> <span class="u">% (yoxlama)</span></label><input id="f-want" class="num" inputmode="decimal" value="0.10"></div>
+        <div class="field wide"><label for="f-note"><b>Qeyd</b></label><input id="f-note" placeholder="məs. reagent dəyişikliyi, nümunə mənbəyi"></div>
+      </div>
+      <div class="btns">
+        <button class="b pri" id="btnSave">Gündəliyə saxla</button>
+        <button class="b" id="btnClear">Formanı təmizlə</button>
+        <span class="msg" id="saveMsg" role="status"></span>
+      </div>
+      <p class="msg">Ulduzlu xanalar saxlamaq üçün lazımdır. Vergül də işləyir: <span class="mono">0,646</span>.</p>
+    </div>
+
+    <div class="panel" id="resultPanel">
+      <div class="verdict s-NONE" id="verdict"><div class="big" id="vBig">—</div><p id="vText">Feed Cu, tail Cu və conc Cu daxil et.</p></div>
+      <div>
+        <h3>Tail hədəf zolağı</h3>
+        <div class="band" id="band" aria-hidden="true"></div>
+      </div>
+      <div class="kv" id="kvMain"></div>
+      <h3>Reallıq yoxlaması</h3>
+      <div class="kv" id="kvReal"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row"><h2>Fərziyyələr</h2><div class="btns"><button class="b sm" id="btnAssDef">Standarta qaytar</button><button class="b sm pri" id="btnAssSave">Fərziyyələri saxla</button></div></div>
+    <div class="form" id="assForm"></div>
+    <span class="msg" id="assMsg" role="status"></span>
+  </div>
+</section>
+
+<!-- ============ GÜNDƏLİK ============ -->
+<section class="view" id="v-log" hidden>
+  <div class="tiles" id="logTiles"></div>
+  <div class="row">
+    <h2>Analiz gündəliyi</h2>
+    <div class="btns">
+      <label class="msg" for="logFilter">Vəziyyət</label>
+      <select id="logFilter" style="width:auto"><option value="">Hamısı</option><option>ƏLA</option><option>NORMAL</option><option>DİQQƏT</option><option>PİS</option></select>
+      <button class="b sm" id="btnCsv" hidden>CSV yüklə</button>
+      <button class="b sm pri" id="btnNew">Yeni analiz</button>
+    </div>
+  </div>
+  <div class="tablebox"><table id="logTable"></table></div>
+  <p class="msg">Qırmızı: S/Cu &gt; 1.3 (pirit) · conc Si &gt; 3 · cl. scav tail &gt; 0.4 · pH &gt; 11.8. Hədəf CuOx ölçülməyibsə təxmin edilir (<span class="mono">t</span> işarəsi).</p>
+</section>
+
+<!-- ============ TREND ============ -->
+<section class="view" id="v-trend" hidden>
+  <div class="row"><h2>Total tail Cu və hədəf zolağı</h2>
+    <div class="btns"><label class="msg" for="trendN">Göstər</label><select id="trendN" style="width:auto"><option value="15">Son 15</option><option value="30" selected>Son 30</option><option value="0">Hamısı</option></select></div></div>
+  <div class="panel"><div id="chartTail"></div>
+    <div class="legend"><span><i style="background:var(--band)"></i>Hədəf zolağı (aşağı–yuxarı)</span><span><i style="background:var(--bad);height:3px"></i>Faktiki total tail</span></div></div>
+  <h2>Cu bərpası</h2>
+  <div class="panel"><div id="chartRec"></div>
+    <div class="legend"><span><i class="s-ELA" style="background:var(--good)"></i>ƏLA</span><span><i style="background:var(--info)"></i>NORMAL</span><span><i style="background:var(--warn)"></i>DİQQƏT</span><span><i style="background:var(--bad)"></i>PİS</span></div></div>
+  <h2>Konsentrat keyfiyyəti — S/Cu</h2>
+  <div class="panel"><div id="chartSCu"></div>
+    <div class="legend"><span><i style="background:var(--copper);height:3px"></i>S/Cu</span><span><i style="background:var(--muted);height:2px"></i>1.01 xalkopirit · 1.3 diqqət həddi</span></div></div>
+</section>
+
+<!-- ============ DOZA ============ -->
+<section class="view" id="v-dose" hidden>
+  <div class="panel">
+    <div class="row"><h2>Reagent doza kalkulyatoru</h2>
+      <div class="btns"><label class="msg" for="d-tph">Tonaj, t/saat</label><input id="d-tph" class="num" inputmode="decimal" style="width:90px"></div></div>
+    <div class="formula">Doza (ml/t aktiv) = X ml ÷ Y san × konsentrasiya/100 × 3600 ÷ tonaj      g/t = ml/t × sıxlıq</div>
+    <div class="tablebox"><table id="doseTable"></table></div>
+    <div class="btns">
+      <button class="b sm" id="btnDoseAdd">+ Sətir əlavə et</button>
+      <input id="d-name" placeholder="Dəst adı (məs. 6 noyabr 00:17)" style="max-width:280px">
+      <button class="b pri" id="btnDoseSave">Doza dəstini saxla</button>
+      <span class="msg" id="doseMsg" role="status"></span>
+    </div>
+  </div>
+  <div class="cols">
+    <div class="panel"><h3>Reagent üzrə cəmi</h3><div class="kv" id="doseSum"></div></div>
+    <div class="panel"><h3>Saxlanmış dəstlər</h3><div id="doseHist"></div></div>
+  </div>
+</section>
+
+<!-- ============ TƏLİMAT ============ -->
+<section class="view" id="v-help" hidden>
+  <div class="panel doc">
+    <h2>Necə istifadə etməli</h2>
+    <ol>
+      <li><b>Kalkulyator</b>: analiz nəticələrini yaz, nəticələr dərhal hesablanır. <b>Gündəliyə saxla</b> düyməsi dəsti bazaya yazır.</li>
+      <li><b>Gündəlik</b>: saxlanmış bütün analizlər. Sətirdə <b>Düzəlt</b> formaya yükləyir, dəyişib yenidən saxlayırsan. <b>Sil</b> təsdiq istəyir.</li>
+      <li><b>Trend</b>: tail-in hədəf zolağına qarşı, bərpa və S/Cu qrafikləri. Gündəlikdən avtomatik qurulur.</li>
+      <li><b>Doza</b>: X ml / Y san ölçülərindən ml/t və g/t. Hədəf doza yazsan, lazımi Y saniyəni verir. Dəsti adla saxlayıb sonra geri yükləyə bilərsən.</li>
+      <li><b>Fərziyyələr</b> (Kalkulyatorun altında) bütün hesablamalara təsir edir. Saxlayanda bütün gündəlik yenidən hesablanır.</li>
+    </ol>
+    <p>Yaddaş: səhifə claude.ai-da açılanda məlumat bulud bazasında saxlanır və hər açılışda yerindədir (yuxarıda yaşıl nöqtə). Fayl kompüterdə birbaşa açılanda yalnız həmin brauzerdə saxlanır (narıncı nöqtə).</p>
+  </div>
+  <div class="panel doc">
+    <h2>Düsturlar</h2>
+    <div class="formula">Mass pull          = (f − t) / (c − t)
+Ümumi bərpa        = c(f − t) / f(c − t)
+Feed sulfid Cu     = Feed Cu − Feed CuOx
+Sulfid bərpası     = 1 − (Tail Cu − Tail CuOx) × (1 − mass pull) / Feed sulfid Cu
+Oksid bərpası      = 1 − Tail CuOx × (1 − mass pull) / Feed CuOx
+Hədəf tail         = Tail CuOx + Feed sulfid Cu × (1 − sulfid bərpası) / (1 − mass pull) + cl. scav əlavəsi
+  aşağı hədd: sulfid bərpası 90%, cl. scav min 0.02
+  yuxarı hədd: sulfid bərpası 85%, cl. scav max 0.03
+Cu itkisi (t/gün)  = tonaj × 24 × (1 − mass pull) × tail Cu / 100</div>
+    <p>Vəziyyət: <span class="pill s-ELA">ƏLA</span> tail ≤ aşağı hədd · <span class="pill s-NORMAL">NORMAL</span> ≤ yuxarı hədd · <span class="pill s-DIQQET">DİQQƏT</span> ≤ yuxarı × 1.25 · <span class="pill s-PIS">PİS</span> daha yüksək.</p>
+    <p>CuOx ölçülməyəndə: Feed CuOx = Feed Cu × oksid payı; Tail CuOx = Feed CuOx × (1 − oksid bərpası) / (1 − mass pull). Oksid bərpası <b>avtomatik</b> rejimdə gündəlikdə hər iki CuOx ölçülmüş ən son analizdən götürülür (8 noyabr 23:00: 1 − 0.074 × 0.980 / 0.1019 = 28.8%).</p>
+  </div>
+  <div class="panel doc">
+    <h2>İş qaydaları</h2>
+    <ul>
+      <li>Bir dəfəyə bir dəyişiklik, sonra 1–2 analiz (2–4 saat) gözlə.</li>
+      <li>Hər dəyişiklikdən sonra tail Cu, conc Cu, S/Cu, Fe/Cu, Si izlə; mümkünsə Mg/MgO və CuOx.</li>
+      <li>Lime və SMBS-i eyni anda dəyişmə (SMBS pH-ı salır).</li>
+      <li>Tonaj dəyişəndə sərfləri yenidən hesabla (Doza bölməsi).</li>
+      <li>Silikat depressantını yalnız conc Si yüksələndə düşün; talk üçün CMC/quar — əvvəlcə Mg + XRD ilə təsdiqlə.</li>
+      <li>Hər növbədə eyni vaxtda tam dəst: feed, rougher tail, total tail, cleaner scavenger tail, conc.</li>
+    </ul>
+  </div>
+</section>
+</main>
+
+<script>
+(function(){
+"use strict";
+/* ---------- defaults ---------- */
+const DEF = {rsNormal:0.85, rsGood:0.90, csMin:0.02, csMax:0.03, oxFrac:0.1577, oxRec:0.27, oxAuto:true, limReal:0.95, limHard:0.90};
+const ASS_FIELDS = [
+  ["rsNormal","Sulfid bərpası — normal iş","%",true,"Yuxarı hədd üçün"],
+  ["rsGood","Sulfid bərpası — çox yaxşı iş","%",true,"Aşağı hədd üçün"],
+  ["csMin","Cl. scav əlavəsi — min","% Cu",false,"Total tail-ə pay"],
+  ["csMax","Cl. scav əlavəsi — max","% Cu",false,""],
+  ["oxFrac","Feed oksid payı (CuOx yoxdursa)","%",true,"8 noy: 0.1019/0.646"],
+  ["oxRec","Oksid bərpası (əl ilə)","%",true,"Avtomatik söndürüləndə"],
+  ["limReal","Qeyri-real hədd: sulfid bərpası >","%",true,""],
+  ["limHard","Çətin hədd: sulfid bərpası >","%",true,""],
+];
+const STAT = {"ƏLA":"ELA","NORMAL":"NORMAL","DİQQƏT":"DIQQET","PİS":"PIS"};
+const REAGENTS = ["JAM","SIPX","AERO 5151","MIBC","PAX","SMBS","Lime","MX-3754","F-521"];
+const DOSE_DEF = [
+  {pt:"151 box",rg:"JAM",x:100,y:14,c:100,d:null,t:null},
+  {pt:"151 box",rg:"AERO 5151",x:10,y:10,c:100,d:null,t:null},
+  {pt:"151",rg:"SIPX",x:100,y:2,c:14,d:null,t:null},
+  {pt:"151",rg:"MIBC",x:50,y:4,c:100,d:0.81,t:null},
+  {pt:"152",rg:"JAM",x:100,y:32,c:100,d:null,t:null},
+  {pt:"152",rg:"SIPX",x:100,y:7,c:14,d:null,t:null},
+  {pt:"153",rg:"MIBC",x:50,y:4,c:100,d:0.81,t:null},
+];
+
+/* ---------- state ---------- */
+const S = {analyses:[], settings:{...DEF}, dosing:{tph:450,rows:DOSE_DEF.map(r=>({...r})),name:""}, doseHist:[], editId:null, mode:"pending", readOnly:false, loaded:false};
+let db=null, dl=null;
+
+/* ---------- utils ---------- */
+const $ = id => document.getElementById(id);
+const num = v => { if(v===null||v===undefined) return null; const s=String(v).trim().replace(",","."); if(s==="") return null; const n=Number(s); return Number.isFinite(n)?n:null; };
+const fin = v => typeof v==="number" && Number.isFinite(v);
+const f = (v,d=3) => fin(v) ? v.toFixed(d) : "—";
+const pct = (v,d=1) => fin(v) ? (v*100).toFixed(d)+"%" : "—";
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const sortKey = a => (a.date||"")+"T"+(a.time||"00:00");
+const fmtDate = d => d ? d.slice(8,10)+"."+d.slice(5,7)+"."+d.slice(0,4) : "—";
+
+/* ---------- core calculation ---------- */
+function oxRecUsed(st){
+  if(!st.oxAuto) return {v:st.oxRec, src:"əl ilə"};
+  const m = [...S.analyses].filter(a=>fin(a.feedCuOx)&&fin(a.tailCuOx)&&fin(a.feedCu)&&fin(a.tailCu)&&fin(a.concCu)).sort((a,b)=>sortKey(b).localeCompare(sortKey(a)))[0];
+  if(!m) return {v:st.oxRec, src:"əl ilə (ölçülmüş CuOx yoxdur)"};
+  const mp=(m.feedCu-m.tailCu)/(m.concCu-m.tailCu);
+  const v=1-m.tailCuOx*(1-mp)/m.feedCuOx;
+  return fin(v)&&v>0&&v<1 ? {v, src:"avto: "+fmtDate(m.date)+" "+(m.time||"")} : {v:st.oxRec, src:"əl ilə"};
+}
+function calc(a, st, oxR){
+  const r={};
+  const fC=a.feedCu, t=a.tailCu, c=a.concCu;
+  if(!fin(fC)||!fin(t)) return null;
+  r.mp = fin(c)&&c>t ? (fC-t)/(c-t) : null;
+  const tm = fin(r.mp) ? 1-r.mp : 1;
+  r.rec = fin(r.mp) ? c*(fC-t)/(fC*(c-t)) : null;
+  r.feedOxMeasured = fin(a.feedCuOx); r.tailOxMeasured = fin(a.tailCuOx);
+  r.feedOx = r.feedOxMeasured ? a.feedCuOx : fC*st.oxFrac;
+  r.tailOx = r.tailOxMeasured ? a.tailCuOx : r.feedOx*(1-oxR)/tm;
+  r.measured = r.feedOxMeasured && r.tailOxMeasured;
+  r.feedS = fC - r.feedOx;
+  r.tailS = t - r.tailOx;
+  r.feedOxFrac = r.feedOx/fC; r.tailOxFrac = r.tailOx/t;
+  r.rs = r.feedS>0 ? 1 - r.tailS*tm/r.feedS : null;
+  r.rox = r.feedOx>0 ? 1 - r.tailOx*tm/r.feedOx : null;
+  r.low = r.tailOx + r.feedS*(1-st.rsGood)/tm + st.csMin;
+  r.high = r.tailOx + r.feedS*(1-st.rsNormal)/tm + st.csMax;
+  r.status = t<=r.low ? "ƏLA" : t<=r.high ? "NORMAL" : t<=r.high*1.25 ? "DİQQƏT" : "PİS";
+  r.recHigh = fin(c) ? c*(fC-r.high)/(fC*(c-r.high)) : null;
+  r.gap = fin(r.recHigh)&&fin(r.rec) ? r.recHigh-r.rec : null;
+  r.loss = fin(a.tph) ? a.tph*24*tm*t/100 : null;
+  r.excess = fin(a.tph) ? Math.max(0, a.tph*24*tm*(t-r.high)/100) : null;
+  r.sCu = fin(a.concS)&&fin(c) ? a.concS/c : null;
+  r.feCu = fin(a.concFe)&&fin(c) ? a.concFe/c : null;
+  return r;
+}
+function reality(a, r, st, want){
+  if(!r||!fin(want)) return null;
+  const tm = fin(r.mp)?1-r.mp:1;
+  const req = 1-(want-r.tailOx-st.csMin)*tm/r.feedS;
+  const rec = fin(a.concCu) ? a.concCu*(a.feedCu-want)/(a.feedCu*(a.concCu-want)) : null;
+  const v = want<=r.tailOx+st.csMin ? "MÜMKÜN DEYİL" : req>st.limReal ? "REAL DEYİL" : req>st.limHard ? "ÇƏTİN" : "REAL";
+  return {req, rec, v};
+}
+
+/* ---------- storage ---------- */
+const LS="flotasiya-panel-v1";
+function lsLoad(){ try{ const j=JSON.parse(localStorage.getItem(LS)||"null"); if(j){ S.analyses=j.analyses||[]; S.settings={...DEF,...(j.settings||{})}; if(j.dosing) S.dosing=j.dosing; S.doseHist=j.doseHist||[]; } }catch(e){} }
+function lsSave(){ try{ localStorage.setItem(LS, JSON.stringify({analyses:S.analyses,settings:S.settings,dosing:S.dosing,doseHist:S.doseHist})); return true; }catch(e){ return false; } }
+function setStore(kind,text){ $("storeDot").className="dot "+kind; $("storeText").textContent=text; }
+function dbErr(e){
+  const c=e&&e.code;
+  if(c==="invalid_argument"){ S.readOnly=true; applyReadOnly(); return "Bu səhifədə yazmaq icazən yoxdur — yalnız baxış."; }
+  if(c==="quota_exceeded") return "Baza dolub: köhnə analizləri silib yenidən yoxla.";
+  if(c==="resource_exhausted") return "Çox tez-tez yazılır — bir neçə saniyə gözlə.";
+  return "Saxlanmadı: bağlantı yoxdur. Bir az sonra yenidən yoxla.";
+}
+function applyReadOnly(){ ["btnSave","btnAssSave","btnDoseSave"].forEach(id=>{ $(id).disabled=S.readOnly; }); renderLog(); }
+
+const store = {
+  async saveAnalysis(obj,id){
+    if(S.mode==="db"){ if(id) await db.doc("analyses/"+id).set(obj); else await db.collection("analyses").add(obj); return; }
+    if(id){ S.analyses=S.analyses.map(a=>a.id===id?{...obj,id}:a); } else { S.analyses.push({...obj,id:"l"+Date.now().toString(36)}); }
+    lsSave(); renderAll();
+  },
+  async delAnalysis(id){
+    if(S.mode==="db"){ await db.doc("analyses/"+id).delete(); return; }
+    S.analyses=S.analyses.filter(a=>a.id!==id); lsSave(); renderAll();
+  },
+  async saveSettings(st){
+    if(S.mode==="db"){ await db.doc("settings/main").set(st); return; }
+    S.settings={...st}; lsSave(); renderAll();
+  },
+  async saveDosing(d){
+    const hist={...d, at:new Date().toISOString()};
+    if(S.mode==="db"){ await db.doc("dosing/current").set(d); await db.collection("doseHistory").add(hist); return; }
+    S.dosing=d; S.doseHist=[{...hist,id:"l"+Date.now().toString(36)},...S.doseHist].slice(0,40); lsSave(); renderDose();
+  },
+  async delDose(id){
+    if(S.mode==="db"){ await db.doc("doseHistory/"+id).delete(); return; }
+    S.doseHist=S.doseHist.filter(h=>h.id!==id); lsSave(); renderDose();
+  }
+};
+
+async function initStore(){
+  if(!(window.claude && typeof window.claude.use==="function")){
+    S.mode="local"; lsLoad(); S.loaded=true; setStore("loc","Yalnız bu brauzerdə saxlanır"); renderAll(); return;
+  }
+  setStore("","Bulud bazasına qoşulur…");
+  let d=null; try{ d=await window.claude.use("db"); }catch(e){ d=null; }
+  try{ dl=await window.claude.use("downloads"); }catch(e){ dl=null; }
+  $("btnCsv").hidden=!dl;
+  if(!d){ S.mode="local"; lsLoad(); S.loaded=true; setStore("loc","Bulud yoxdur — yalnız bu brauzerdə saxlanır"); renderAll(); return; }
+  db=d; S.mode="db";
+  try{ const u=await window.claude.use("user"); if(u&&typeof u.can==="function"){ const w=await u.can("data.write"); if(w===false){ S.readOnly=true; applyReadOnly(); } } }catch(e){}
+  const timer=setTimeout(()=>{ if(!S.loaded) setStore("err","Baza cavab vermir — məlumat köhnə ola bilər"); },10000);
+  const done=(meta)=>{ if(meta&&!meta.fromCache){ S.loaded=true; clearTimeout(timer); setStore("ok", S.readOnly?"Bulud bazası · yalnız baxış":"Bulud bazasında saxlanır"); } };
+  const onErr=e=>{ clearTimeout(timer); setStore("err", e&&e.code==="revoked"?"Baza əlçatan deyil":"Baza bağlantısı kəsildi — səhifəni yenidən aç"); };
+  db.collection("analyses").onSnapshot(snap=>{ S.analyses=snap.docs.map(x=>({...x.data(),id:x.id})); done(snap.metadata); renderAll(); }, onErr);
+  db.doc("settings/main").onSnapshot(snap=>{ S.settings={...DEF,...(snap.exists?snap.data():{})}; renderAll(); }, onErr);
+  db.doc("dosing/current").onSnapshot(snap=>{ if(snap.exists){ const x=snap.data(); S.dosing={tph:x.tph, name:x.name||"", rows:(x.rows||[]).map(r=>({...r}))}; } renderDose(); }, onErr);
+  db.collection("doseHistory").orderBy("at","desc").limit(40).onSnapshot(snap=>{ S.doseHist=snap.docs.map(x=>({...x.data(),id:x.id})); renderDose(); }, onErr);
+}
+
+/* ---------- tabs ---------- */
+$("tabs").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-v]"); if(!b) return;
+  showView(b.dataset.v);
+});
+function showView(v){
+  document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-selected", x.dataset.v===v?"true":"false"));
+  document.querySelectorAll("section.view").forEach(s=>{ s.hidden = s.id!=="v-"+v; });
+  if(v==="trend") renderTrend();
+  try{ localStorage.setItem(LS+"-tab",v); }catch(e){}
+}
+
+/* ---------- calculator ---------- */
+const FIELDS=["date","time","tph","feedCu","feedCuOx","tailCu","tailCuOx","clScav","concCu","concS","concFe","concSi","pH","note"];
+const NUMF=["tph","feedCu","feedCuOx","tailCu","tailCuOx","clScav","concCu","concS","concFe","concSi","pH"];
+function readForm(){ const a={}; FIELDS.forEach(k=>{ const v=$("f-"+k).value; a[k]= NUMF.includes(k)? num(v) : v.trim(); }); return a; }
+function fillForm(a){ FIELDS.forEach(k=>{ const v=a?a[k]:""; $("f-"+k).value = v===null||v===undefined ? "" : String(v); }); }
+function kvRows(el, rows){ el.innerHTML = rows.map(([k,sub,v,hl])=>`<div class="k${hl?" hl":""}">${esc(k)}${sub?`<small>${esc(sub)}</small>`:""}</div><div class="v${hl?" hl":""}">${v}</div>`).join(""); }
+function renderCalc(){
+  const a=readForm(); const st=S.settings; const ox=oxRecUsed(st);
+  const r=calc(a,st,ox.v);
+  const vd=$("verdict");
+  if(!r){ vd.className="verdict s-NONE"; $("vBig").textContent="—"; $("vText").textContent="Feed Cu, tail Cu və conc Cu daxil et."; $("band").innerHTML=""; kvRows($("kvMain"),[]); kvRows($("kvReal"),[]); return; }
+  vd.className="verdict s-"+STAT[r.status]; $("vBig").textContent=r.status;
+  $("vText").innerHTML=`Faktiki tail <b class="mono">${f(a.tailCu)}</b>, hədəf <b class="mono">${f(r.low)}–${f(r.high)}</b>.${fin(r.excess)&&r.excess>0?` Hədəfdən artıq itki <b class="mono">${f(r.excess,2)} t Cu/gün</b>.`:""}${!r.measured?" CuOx təxmindir.":""}`;
+  // band
+  const hi=Math.max(a.tailCu, r.high)*1.25, x=v=>Math.min(100,Math.max(0,v/hi*100));
+  $("band").innerHTML=`<div class="track"></div><div class="zone" style="left:${x(r.low)}%;width:${x(r.high)-x(r.low)}%"></div><div class="mark" style="left:calc(${x(a.tailCu)}% - 1px)"></div>
+   <span class="lbl" style="left:${x(r.low)}%">${f(r.low)}</span><span class="lbl" style="left:${x(r.high)}%">${f(r.high)}</span><span class="lbl" style="left:${x(a.tailCu)}%;top:28px;color:var(--bad)">${f(a.tailCu)}</span>`;
+  $("band").style.marginBottom="14px";
+  kvRows($("kvMain"),[
+    ["Feed oksid / sulfid Cu", r.feedOxMeasured?"ölçülüb":"təxmin: oksid payı "+pct(st.oxFrac), `${f(r.feedOx,4)} / ${f(r.feedS)}`],
+    ["Tail oksid / sulfid Cu", r.tailOxMeasured?"ölçülüb":"təxmin: oksid bərpası "+pct(ox.v)+" ("+ox.src+")", `${f(r.tailOx)} / ${f(r.tailS)}`],
+    ["Tail oksid payı","",pct(r.tailOxFrac)],
+    ["Mass pull","(f − t)/(c − t)",pct(r.mp,2)],
+    ["Ümumi Cu bərpası","c(f − t)/f(c − t)",pct(r.rec),true],
+    ["Sulfid Cu bərpası","",pct(r.rs)],
+    ["Oksid Cu bərpası","",pct(r.rox)],
+    ["Hədəf tail — aşağı","sulfid "+pct(st.rsGood,0)+" + cl. scav "+f(st.csMin,2),f(r.low),true],
+    ["Hədəf tail — yuxarı","sulfid "+pct(st.rsNormal,0)+" + cl. scav "+f(st.csMax,2),f(r.high),true],
+    ["Hədəfdə gözlənilən bərpa","",pct(r.recHigh)],
+    ["Bərpa boşluğu","faiz bəndi",fin(r.gap)?(r.gap*100).toFixed(1):"—"],
+    ["S/Cu · Fe/Cu","xalkopirit 1.01 · 0.88",`${f(r.sCu,2)} · ${f(r.feCu,2)}`],
+    ["Tail-ə gedən Cu","t Cu/gün",f(r.loss,2)],
+    ["Hədəfdən artıq itki","t Cu/gün",f(r.excess,2),true],
+  ]);
+  const want=num($("f-want").value); const q=reality(a,r,st,want);
+  if(q){
+    const cls={"REAL":"ELA","ÇƏTİN":"DIQQET","REAL DEYİL":"PIS","MÜMKÜN DEYİL":"PIS"}[q.v];
+    kvRows($("kvReal"),[["İstənilən tail","",f(want)],["Lazım olan sulfid bərpası","",pct(q.req)],["Bu tail-də ümumi bərpa","",pct(q.rec)],["Qiymət","",`<span class="pill s-${cls}">${q.v}</span>`]]);
+  } else kvRows($("kvReal"),[["İstənilən tail daxil et","","—"]]);
+}
+let formTouched=false;
+$("calcForm").addEventListener("input",()=>{ formTouched=true; renderCalc(); });
+function prefillLatest(){
+  if(formTouched||S.editId||!S.analyses.length) return;
+  const a=[...S.analyses].sort((x,y)=>sortKey(y).localeCompare(sortKey(x)))[0];
+  S.editId=a.id; fillForm(a); updEditUi(); $("saveMsg").className="msg"; $("saveMsg").textContent="Son analiz göstərilir. Yeni dəst üçün: Formanı təmizlə.";
+}
+$("btnClear").addEventListener("click",()=>{ formTouched=true; S.editId=null; fillForm(null); setToday(); updEditUi(); renderCalc(); renderLog(); });
+function setToday(){ const d=new Date(); $("f-date").value=d.toISOString().slice(0,10); $("f-time").value=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+function updEditUi(){ $("editChip").hidden=!S.editId; $("calcTitle").textContent=S.editId?"Analizi düzəlt":"Yeni analiz dəsti"; $("btnSave").textContent=S.editId?"Dəyişikliyi saxla":"Gündəliyə saxla"; }
+$("btnSave").addEventListener("click",async()=>{
+  const a=readForm(); const m=$("saveMsg");
+  const miss=[]; if(!a.date) miss.push("tarix"); if(!fin(a.feedCu)) miss.push("feed Cu"); if(!fin(a.tailCu)) miss.push("tail Cu"); if(!fin(a.concCu)) miss.push("conc Cu");
+  if(miss.length){ m.className="msg err"; m.textContent="Doldur: "+miss.join(", ")+"."; return; }
+  if(a.concCu<=a.tailCu||a.feedCu<=0){ m.className="msg err"; m.textContent="Conc Cu tail Cu-dan böyük olmalıdır."; return; }
+  const obj={}; FIELDS.forEach(k=>{ obj[k]= a[k]===""?null:a[k]; }); obj.savedAt=new Date().toISOString();
+  $("btnSave").disabled=true; m.className="msg"; m.textContent="Saxlanır…";
+  try{ await store.saveAnalysis(obj,S.editId); m.className="msg ok"; m.textContent=(S.editId?"Dəyişiklik saxlandı":"Gündəliyə əlavə edildi")+" · "+fmtDate(a.date)+" "+(a.time||""); S.editId=null; updEditUi(); }
+  catch(e){ m.className="msg err"; m.textContent=dbErr(e); }
+  finally{ $("btnSave").disabled=S.readOnly; }
+});
+
+/* ---------- assumptions ---------- */
+function renderAss(){
+  const st=S.settings, ox=oxRecUsed(st);
+  $("assForm").innerHTML = ASS_FIELDS.map(([k,l,u,isPct,n])=>`<div class="field"><label for="a-${k}"><b>${esc(l)}</b> <span class="u">${u}</span></label><input id="a-${k}" class="num" inputmode="decimal" value="${isPct?+(st[k]*100).toFixed(2):st[k]}"><span class="u">${esc(n)}</span></div>`).join("")
+   + `<div class="field"><label for="a-oxAuto"><b>Oksid bərpası mənbəyi</b></label><select id="a-oxAuto"><option value="1"${st.oxAuto?" selected":""}>Avtomatik — son ölçülmüş CuOx</option><option value="0"${!st.oxAuto?" selected":""}>Əl ilə</option></select><span class="u">İndi: ${pct(ox.v)} · ${esc(ox.src)}</span></div>`;
+}
+function readAss(){ const o={}; for(const [k,,,isPct] of ASS_FIELDS){ const v=num($("a-"+k).value); if(!fin(v)) return null; o[k]=isPct?v/100:v; } o.oxAuto=$("a-oxAuto").value==="1"; return o; }
+$("btnAssSave").addEventListener("click",async()=>{
+  const o=readAss(), m=$("assMsg"); if(!o){ m.className="msg err"; m.textContent="Bütün fərziyyə xanalarına rəqəm yaz."; return; }
+  try{ await store.saveSettings(o); m.className="msg ok"; m.textContent="Fərziyyələr saxlandı — gündəlik yenidən hesablandı."; }catch(e){ m.className="msg err"; m.textContent=dbErr(e); }
+});
+$("btnAssDef").addEventListener("click",()=>{ const keep=S.settings; S.settings={...DEF}; renderAss(); S.settings=keep; $("assMsg").className="msg"; $("assMsg").textContent="Standart dəyərlər yazıldı — saxlamaq üçün düyməni bas."; });
+
+/* ---------- log ---------- */
+let confirmId=null;
+function logRows(){ const st=S.settings, ox=oxRecUsed(st); return [...S.analyses].sort((a,b)=>sortKey(b).localeCompare(sortKey(a))).map(a=>({a, r:calc(a,st,ox.v)})); }
+function renderLog(){
+  const rows=logRows(); const flt=$("logFilter").value;
+  const shown=rows.filter(x=>!flt||(x.r&&x.r.status===flt));
+  // tiles
+  const last=rows[0]; const rec7=rows.slice(0,7).map(x=>x.r&&x.r.rec).filter(fin);
+  const avg=rec7.length?rec7.reduce((s,v)=>s+v,0)/rec7.length:null;
+  const bad=rows.slice(0,10).filter(x=>x.r&&(x.r.status==="PİS"||x.r.status==="DİQQƏT")).length;
+  $("logTiles").innerHTML = last&&last.r ? `
+    <div class="tile"><span class="t">Son total tail · ${fmtDate(last.a.date)} ${esc(last.a.time||"")}</span><span class="n">${f(last.a.tailCu)}</span><span class="s">hədəf ${f(last.r.low)}–${f(last.r.high)} <span class="pill s-${STAT[last.r.status]}">${last.r.status}</span></span></div>
+    <div class="tile"><span class="t">Son Cu bərpası</span><span class="n">${pct(last.r.rec)}</span><span class="s">hədəfdə ${pct(last.r.recHigh)}</span></div>
+    <div class="tile"><span class="t">Orta bərpa · son ${rec7.length} analiz</span><span class="n">${pct(avg)}</span><span class="s">${rows.length} analiz saxlanıb</span></div>
+    <div class="tile"><span class="t">Hədəfdən artıq itki · son</span><span class="n">${f(last.r.excess,2)}</span><span class="s">t Cu/gün${fin(last.a.tph)?"":" — tonaj yazılmayıb"}</span></div>
+    <div class="tile"><span class="t">Son 10 analizdə DİQQƏT/PİS</span><span class="n">${bad}</span><span class="s">analiz</span></div>` : "";
+  const t=$("logTable");
+  if(!rows.length){ t.innerHTML=`<tbody><tr><td class="l" style="border:0"><div class="empty"><b>${S.mode==="pending"?"Məlumatlar yüklənir…":"Hələ analiz saxlanmayıb"}</b><span>Kalkulyatorda analiz nəticələrini yaz və <b>Gündəliyə saxla</b> düyməsini bas. Hər dəst burada bir sətir olacaq.</span></div></td></tr></tbody>`; return; }
+  const fl=(c,v)=>c?` class="flag"`:"";
+  t.innerHTML = `<thead><tr><th class="l">Tarix</th><th class="l">Saat</th><th>Tonaj</th><th>Feed<br>Cu</th><th>Feed<br>CuOx</th><th>Total<br>tail Cu</th><th>Tail<br>CuOx</th><th>Cl. scav<br>tail</th><th>Conc<br>Cu</th><th>S/Cu</th><th>Fe/Cu</th><th>Conc<br>Si</th><th>pH</th><th>Mass<br>pull</th><th>Bərpa</th><th>Hədəf<br>aşağı–yuxarı</th><th class="l">Vəziyyət</th><th>İtki<br>t/gün</th><th class="l">Qeyd</th><th></th></tr></thead><tbody>` +
+  shown.map(({a,r})=>{
+    const est=r&&!r.measured?` <span class="u" title="CuOx təxminidir">t</span>`:"";
+    const act = confirmId===a.id
+      ? `<span class="confirm">Silinsin? <button class="b sm danger" data-del="${a.id}">Bəli, sil</button><button class="b sm" data-cancel="1">Yox</button></span>`
+      : `<button class="b sm" data-edit="${a.id}">Düzəlt</button> <button class="b sm" data-ask="${a.id}"${S.readOnly?" disabled":""}>Sil</button>`;
+    return `<tr${S.editId===a.id?' class="editing"':""}><td class="l">${fmtDate(a.date)}</td><td class="l">${esc(a.time||"")}</td><td>${fin(a.tph)?a.tph:"—"}</td><td>${f(a.feedCu)}</td><td>${f(a.feedCuOx,4)}</td><td><b>${f(a.tailCu)}</b></td><td>${f(a.tailCuOx)}</td>
+    <td${fl(fin(a.clScav)&&a.clScav>0.4)}>${f(a.clScav)}</td><td>${f(a.concCu,2)}</td><td${fl(r&&fin(r.sCu)&&r.sCu>1.3)}>${f(r&&r.sCu,2)}</td><td>${f(r&&r.feCu,2)}</td><td${fl(fin(a.concSi)&&a.concSi>3)}>${f(a.concSi,2)}</td><td${fl(fin(a.pH)&&a.pH>11.8)}>${f(a.pH,2)}</td>
+    <td>${pct(r&&r.mp,2)}</td><td><b>${pct(r&&r.rec)}</b></td><td>${r?f(r.low)+"–"+f(r.high)+est:"—"}</td><td class="l">${r?`<span class="pill s-${STAT[r.status]}">${r.status}</span>`:"—"}</td><td>${f(r&&r.loss,1)}</td><td class="note">${esc(a.note||"")}</td><td class="l">${act}</td></tr>`;
+  }).join("") + `</tbody>`;
+}
+$("logFilter").addEventListener("change",renderLog);
+$("logTable").addEventListener("click",async e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.edit){ const a=S.analyses.find(x=>x.id===b.dataset.edit); if(!a) return; formTouched=true; S.editId=a.id; fillForm(a); updEditUi(); renderCalc(); showView("calc"); $("saveMsg").textContent=""; window.scrollTo({top:0}); return; }
+  if(b.dataset.ask){ confirmId=b.dataset.ask; renderLog(); return; }
+  if(b.dataset.cancel){ confirmId=null; renderLog(); return; }
+  if(b.dataset.del){ const id=b.dataset.del; confirmId=null; try{ await store.delAnalysis(id); if(S.editId===id){ S.editId=null; updEditUi(); } }catch(err){ alertMsg(dbErr(err)); } renderLog(); }
+});
+function alertMsg(t){ const m=$("saveMsg"); m.className="msg err"; m.textContent=t; }
+$("btnNew").addEventListener("click",()=>{ formTouched=true; S.editId=null; fillForm(null); setToday(); updEditUi(); renderCalc(); showView("calc"); });
+$("btnCsv").addEventListener("click",async()=>{
+  const rows=logRows().reverse();
+  const head=["Tarix","Saat","Tonaj","Feed Cu","Feed CuOx","Total tail Cu","Tail CuOx","Cl scav tail Cu","Conc Cu","Conc S","Conc Fe","Conc Si","pH","Mass pull %","Berpa %","Hedef asagi","Hedef yuxari","Veziyyet","Itki t/gun","Qeyd"];
+  const c=v=>v===null||v===undefined?"":String(v).replace(/"/g,'""');
+  const lines=[head.join(";")].concat(rows.map(({a,r})=>[a.date,a.time,a.tph,a.feedCu,a.feedCuOx,a.tailCu,a.tailCuOx,a.clScav,a.concCu,a.concS,a.concFe,a.concSi,a.pH,r&&fin(r.mp)?(r.mp*100).toFixed(2):"",r&&fin(r.rec)?(r.rec*100).toFixed(1):"",r?r.low.toFixed(3):"",r?r.high.toFixed(3):"",r?r.status:"",r&&fin(r.loss)?r.loss.toFixed(2):"",a.note].map(v=>`"${c(v)}"`).join(";")));
+  try{ await dl.save({filename:"flotasiya_gundelik.csv", data:"﻿"+lines.join("\r\n")}); }catch(e){ /* declined or unavailable: nothing to do */ }
+});
+
+/* ---------- trend charts ---------- */
+function trendData(){ const n=+$("trendN").value; const rows=logRows().reverse().filter(x=>x.r); return n?rows.slice(-n):rows; }
+function axisNice(max){ const p=Math.pow(10,Math.floor(Math.log10(max))); const m=max/p; const step=(m<=2?0.5:m<=5?1:2)*p; return {top:Math.ceil(max/step)*step, step}; }
+function svgChart(rows, opt){
+  const W=1000,H=opt.h||300,L=78,R=16,T=14,B=58; const w=W-L-R, h=H-T-B;
+  if(!rows.length) return `<div class="empty"><b>Qrafik üçün analiz yoxdur</b><span>Gündəliyə analiz saxla.</span></div>`;
+  const n=rows.length; const xs=i=> L + (n===1? w/2 : i*(w/(n-1)));
+  const vals=rows.flatMap(opt.vals).filter(fin); const max=Math.max(...vals, opt.minTop||0)*1.08||1;
+  const ax= opt.fixed? opt.fixed : axisNice(max); const y=v=> T + h - (v/ax.top)*h;
+  let g=""; for(let v=0; v<=ax.top+1e-9; v+=ax.step){ g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--chart-grid)"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${opt.yfmt(v)}</text>`; }
+  const every=Math.ceil(n/14); let xl="";
+  rows.forEach((x,i)=>{ if(i%every===0||i===n-1) xl+=`<text x="${xs(i)}" y="${H-B+18}" text-anchor="end" transform="rotate(-35 ${xs(i)} ${H-B+18})">${x.a.date.slice(8,10)}.${x.a.date.slice(5,7)} ${esc(x.a.time||"")}</text>`; });
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opt.label)}">${g}${opt.body(rows,xs,y,{L,R,T,B,W,H,w,h,n})}${xl}<line x1="${L}" x2="${W-R}" y1="${T+h}" y2="${T+h}" stroke="var(--line)"/></svg>`;
+}
+function renderTrend(){
+  if($("v-trend").hidden) return;
+  const rows=trendData();
+  $("chartTail").innerHTML=svgChart(rows,{label:"Total tail Cu və hədəf zolağı",vals:x=>[x.a.tailCu,x.r.high],yfmt:v=>v.toFixed(2),body:(rs,xs,y)=>{
+    const up=rs.map((x,i)=>`${xs(i)},${y(x.r.high)}`).join(" "), lo=rs.map((x,i)=>`${xs(i)},${y(x.r.low)}`).reverse().join(" ");
+    const line=rs.map((x,i)=>`${xs(i)},${y(x.a.tailCu)}`).join(" ");
+    return `<polygon points="${up} ${lo}" fill="var(--band)" opacity=".85"/>`+
+      `<polyline points="${line}" fill="none" stroke="var(--bad)" stroke-width="2.5"/>`+
+      rs.map((x,i)=>`<circle cx="${xs(i)}" cy="${y(x.a.tailCu)}" r="${i===rs.length-1?6:4}" fill="var(--bad)" stroke="var(--panel)" stroke-width="1.5"><title>${fmtDate(x.a.date)} ${esc(x.a.time||"")}: tail ${f(x.a.tailCu)} · hədəf ${f(x.r.low)}–${f(x.r.high)} · ${x.r.status}</title></circle>`).join("")+
+      (()=>{const i=rs.length-1,x=rs[i];return `<text x="${xs(i)-8}" y="${y(x.a.tailCu)-10}" text-anchor="end" style="fill:var(--bad);font-weight:600">${f(x.a.tailCu)}</text>`;})();
+  }});
+  const col={"ƏLA":"var(--good)","NORMAL":"var(--info)","DİQQƏT":"var(--warn)","PİS":"var(--bad)"};
+  $("chartRec").innerHTML=svgChart(rows,{h:260,label:"Cu bərpası",vals:x=>[x.r.rec],fixed:{top:1,step:0.2},yfmt:v=>Math.round(v*100)+"%",body:(rs,xs,y,d)=>{
+    const bw=Math.min(36, d.w/rs.length*0.6);
+    return rs.map((x,i)=>fin(x.r.rec)?`<rect x="${xs(i)-bw/2}" y="${y(Math.max(0,x.r.rec))}" width="${bw}" height="${y(0)-y(Math.max(0,x.r.rec))}" rx="2" fill="${col[x.r.status]}"><title>${fmtDate(x.a.date)} ${esc(x.a.time||"")}: ${pct(x.r.rec)}</title></rect>${rs.length<=20?`<text x="${xs(i)}" y="${y(Math.max(0,x.r.rec))-5}" text-anchor="middle">${Math.round(x.r.rec*100)}</text>`:""}`:"").join("");
+  }});
+  const sr=rows.filter(x=>fin(x.r.sCu));
+  $("chartSCu").innerHTML=svgChart(sr,{h:240,label:"S/Cu",vals:x=>[x.r.sCu],minTop:1.5,yfmt:v=>v.toFixed(1),body:(rs,xs,y,d)=>
+    `<line x1="${d.L}" x2="${d.W-d.R}" y1="${y(1.01)}" y2="${y(1.01)}" stroke="var(--muted)" stroke-dasharray="4 4"/><line x1="${d.L}" x2="${d.W-d.R}" y1="${y(1.3)}" y2="${y(1.3)}" stroke="var(--warn)" stroke-dasharray="6 4"/>`+
+    `<polyline points="${rs.map((x,i)=>`${xs(i)},${y(x.r.sCu)}`).join(" ")}" fill="none" stroke="var(--copper)" stroke-width="2.5"/>`+
+    rs.map((x,i)=>`<circle cx="${xs(i)}" cy="${y(x.r.sCu)}" r="4" fill="var(--copper)"><title>${fmtDate(x.a.date)} ${esc(x.a.time||"")}: S/Cu ${f(x.r.sCu,2)}</title></circle>`).join("")});
+}
+$("trendN").addEventListener("change",renderTrend);
+
+/* ---------- dosing ---------- */
+function doseCalc(r,tph){
+  const ok=fin(r.x)&&fin(r.y)&&r.y>0&&fin(r.c)&&fin(tph)&&tph>0;
+  const mlt= ok? r.x/r.y*r.c/100*3600/tph : null;
+  return {mlmin: fin(r.x)&&fin(r.y)&&r.y>0? r.x/r.y*60:null, mlt, gt: fin(mlt)&&fin(r.d)? mlt*r.d : null,
+          yreq: fin(r.t)&&r.t>0&&fin(r.x)&&fin(r.c)&&fin(tph)&&tph>0 ? r.x*r.c/100*3600/(tph*r.t) : null,
+          lday: ok? r.x/r.y*r.c/100*86400/1000 : null};
+}
+let doseBuilt=false;
+function renderDose(force){
+  const D=S.dosing; const active=document.activeElement;
+  const editing = active && (active.closest&&active.closest("#doseTable")||active.id==="d-tph");
+  if(!editing||force){
+    $("d-tph").value=D.tph??"";
+    const opts=REAGENTS.map(x=>`<option>${x}</option>`).join("");
+    $("doseTable").innerHTML=`<thead><tr><th class="l">Nöqtə</th><th class="l">Reagent</th><th>X ml</th><th>Y san</th><th>Kons. %</th><th>Sıxlıq g/ml</th><th>ml/dəq</th><th>Doza ml/t</th><th>Doza g/t</th><th>Hədəf ml/t</th><th>Lazımi Y san</th><th>Aktiv L/gün</th><th></th></tr></thead><tbody>`+
+      D.rows.map((r,i)=>`<tr data-i="${i}"><td class="l"><input id="dp-${i}" data-k="pt" value="${esc(r.pt||"")}" style="width:80px"></td>
+      <td class="l"><input id="dr-${i}" data-k="rg" list="rglist" value="${esc(r.rg||"")}" style="width:110px"></td>
+      ${["x","y","c","d","t"].map((k,j)=>`<td><input id="d${k}-${i}" data-k="${k}" class="num" inputmode="decimal" value="${r[k]??""}" style="width:${k==="c"||k==="d"?70:66}px"></td>${j===3?`<td data-o="mlmin"></td><td data-o="mlt"></td><td data-o="gt"></td>`:""}`).join("")}
+      <td data-o="yreq"></td><td data-o="lday"></td><td><button class="b sm" data-rm="${i}" aria-label="Sətri sil">×</button></td></tr>`).join("")+`</tbody>`;
+    if(!$("rglist")){ const dlst=document.createElement("datalist"); dlst.id="rglist"; dlst.innerHTML=opts; document.body.appendChild(dlst); }
+  }
+  // outputs
+  const tph=D.tph; const sums={};
+  D.rows.forEach((r,i)=>{ const o=doseCalc(r,tph); const tr=document.querySelector(`#doseTable tr[data-i="${i}"]`); if(tr){
+      tr.querySelector('[data-o="mlmin"]').textContent=f(o.mlmin,1); const mt=tr.querySelector('[data-o="mlt"]'); mt.innerHTML=`<b>${f(o.mlt,1)}</b>`;
+      tr.querySelector('[data-o="gt"]').textContent=f(o.gt,1); tr.querySelector('[data-o="yreq"]').innerHTML=fin(o.yreq)?`<b style="color:var(--copper)">${f(o.yreq,1)}</b>`:"—"; tr.querySelector('[data-o="lday"]').textContent=f(o.lday,1); }
+    if(r.rg&&fin(o.mlt)){ const s=sums[r.rg]||(sums[r.rg]={mlt:0,gt:0,hasG:false}); s.mlt+=o.mlt; if(fin(o.gt)){s.gt+=o.gt;s.hasG=true;} } });
+  const keys=Object.keys(sums); const coll=["JAM","SIPX","PAX"].reduce((s,k)=>s+(sums[k]?sums[k].mlt:0),0);
+  kvRows($("doseSum"), keys.length? keys.map(k=>[k,"",`${f(sums[k].mlt,1)} ml/t${sums[k].hasG?" · "+f(sums[k].gt,1)+" g/t":""}`]).concat([["Kollektor cəmi","JAM + SIPX + PAX",f(coll,1)+" ml/t",true]]) : [["Sətir yoxdur","","—"]]);
+  // history
+  const h=S.doseHist;
+  $("doseHist").innerHTML = h.length ? `<div class="kv">`+h.map(x=>`<div class="k"><b>${esc(x.name||"Adsız dəst")}</b><small>${x.at?new Date(x.at).toLocaleString("az-AZ",{dateStyle:"short",timeStyle:"short"}):""} · ${x.tph} t/saat · ${(x.rows||[]).length} nöqtə</small></div><div class="v" style="gap:6px"><button class="b sm" data-load="${x.id}">Yüklə</button><button class="b sm" data-rmh="${x.id}"${S.readOnly?" disabled":""}>Sil</button></div>`).join("")+`</div>`
+    : `<div class="empty"><b>Saxlanmış dəst yoxdur</b><span>Sərfləri yaz, ad ver və <b>Doza dəstini saxla</b>. Hər saxlama burada tarixlə qalır.</span></div>`;
+}
+$("doseTable").addEventListener("input",e=>{
+  const inp=e.target; const tr=inp.closest("tr[data-i]"); if(!tr) return; const i=+tr.dataset.i, k=inp.dataset.k;
+  S.dosing.rows[i][k] = (k==="pt"||k==="rg") ? inp.value : num(inp.value); renderDose();
+});
+$("doseTable").addEventListener("click",e=>{ const b=e.target.closest("button[data-rm]"); if(!b) return; S.dosing.rows.splice(+b.dataset.rm,1); renderDose(true); });
+$("d-tph").addEventListener("input",e=>{ S.dosing.tph=num(e.target.value); renderDose(); });
+$("btnDoseAdd").addEventListener("click",()=>{ S.dosing.rows.push({pt:"",rg:"",x:null,y:null,c:100,d:null,t:null}); renderDose(true); });
+$("btnDoseSave").addEventListener("click",async()=>{
+  const m=$("doseMsg"); const d={tph:S.dosing.tph, name:$("d-name").value.trim()||("Dəst "+new Date().toLocaleString("az-AZ",{dateStyle:"short",timeStyle:"short"})), rows:S.dosing.rows.map(r=>({...r}))};
+  if(!fin(d.tph)){ m.className="msg err"; m.textContent="Tonajı yaz."; return; }
+  try{ await store.saveDosing(d); m.className="msg ok"; m.textContent="Saxlandı: "+d.name; $("d-name").value=""; }catch(e){ m.className="msg err"; m.textContent=dbErr(e); }
+});
+$("doseHist").addEventListener("click",async e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.load){ const x=S.doseHist.find(h=>h.id===b.dataset.load); if(!x) return; S.dosing={tph:x.tph,name:x.name,rows:(x.rows||[]).map(r=>({...r}))}; renderDose(true); $("doseMsg").className="msg"; $("doseMsg").textContent="Yükləndi: "+(x.name||"")+" — cari dəst kimi saxlamaq üçün düyməni bas."; }
+  if(b.dataset.rmh){ try{ await store.delDose(b.dataset.rmh); }catch(err){ $("doseMsg").className="msg err"; $("doseMsg").textContent=dbErr(err); } }
+});
+
+/* ---------- boot ---------- */
+function renderAll(){ prefillLatest(); const ae=document.activeElement; if(!(ae&&ae.closest&&ae.closest("#assForm"))) renderAss(); renderCalc(); renderLog(); renderTrend(); renderDose(); }
+setToday(); updEditUi();
+renderAll();
+try{ const t=localStorage.getItem(LS+"-tab"); if(t&&$("v-"+t)) showView(t); }catch(e){}
+initStore();
+})();
+</script>
