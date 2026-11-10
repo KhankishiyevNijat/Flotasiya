@@ -94,6 +94,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   background: var(--sunken); border: 1px solid var(--line); border-left: 0; border-radius: 0 6px 6px 0;
   color: var(--muted); font-size: 13px; white-space: nowrap;
 }
+.fields.g3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; align-items: end; }
+.fields.g3 .field label { font-size: 12.5px; }
+.fields.g3 .field input { padding: 8px 6px; }
+.fields.g3 .unit { min-width: 0; padding: 0 6px; font-size: 12px; }
 .field small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 3px; }
 .rows { display: flex; flex-direction: column; }
 .row {
@@ -151,7 +155,7 @@ const U = {
   pcs: ["ədəd", "pcs"], kw: ["kVt", "kW"], gpt: ["q/t", "g/t"], mlmin: ["ml/dəq", "mL/min"],
   lh: ["L/saat", "L/h"], kgh: ["kq/saat", "kg/h"], kgd: ["kq/gün", "kg/day"], tmo: ["t/ay", "t/month"],
   h: ["saat", "h"], cms: ["sm/s", "cm/s"], carry: ["t/(saat·m²)", "t/(h·m²)"], lipl: ["t/(saat·m)", "t/(h·m)"],
-  permin: ["1/dəq", "1/min"], mslurry: ["m pulpa", "m slurry"]
+  permin: ["1/dəq", "1/min"], g: ["q", "g"], mslurry: ["m pulpa", "m slurry"]
 };
 const UI = {
   h1: ["Flotasiya Kalkulyatoru", "Flotation Calculator"],
@@ -510,6 +514,86 @@ const MODS = [
     ], table};
   },
   formulas: [["Ardıcıl kameralar: R = R∞ × (1 − (1 + k × t / n)⁻ⁿ)", "Cells in series: R = R∞ × (1 − (1 + k × t / n)⁻ⁿ)"], "Batch: R = R∞ × (1 − e⁻ᵏᵗ)"]
+},
+{
+  id: "labtest", name: ["Lab testi → k", "Lab test → k"], title: ["Laboratoriya kinetik testi", "Laboratory kinetic test"], grid: true,
+  intro: ["Kinetik testin məhsullarının çəkisini və Cu analizini yazın. Bərpa cədvəlini, R∞ və k-nı tapır, k-nı zavod üçün scale-up əmsalına bölür. İstifadə etmədiyiniz konsentratın çəkisinə 0 yazın.",
+          "Enter the mass and Cu assay of each kinetic test product. It builds the recovery table, finds R∞ and k, and divides k by the scale-up factor for the plant. Enter 0 as the mass of any concentrate you did not collect."],
+  inputs: [
+    ...[[0.5, 12, 14.0], [1, 10, 11.9], [2, 16, 9.0], [4, 22, 4.7], [8, 30, 1.1]].flatMap((d, j) => [
+      {k:"t" + (j+1), label:[`K${j+1} toplam vaxt`, `C${j+1} cum. time`], unit:U.min, def:d[0]},
+      {k:"m" + (j+1), label:[`K${j+1} çəki`, `C${j+1} mass`], unit:U.g, def:d[1]},
+      {k:"g" + (j+1), label:[`K${j+1} Cu`, `C${j+1} Cu`], unit:"%", def:d[2]}
+    ]),
+    {k:"mt", label:["Tullantı çəki", "Tails mass"], unit:U.g, def:910},
+    {k:"gt", label:["Tullantı Cu", "Tails Cu"], unit:"%", def:0.036},
+    {k:"S", label:["Scale-up əmsalı", "Scale-up factor"], unit:"×", def:2.5},
+    {k:"Rinf", label:["R∞ (0 = avtomatik)", "R∞ (0 = automatic)"], unit:"%", def:0}
+  ],
+  calc(v) {
+    const pts = [];
+    for (let i = 1; i <= 5; i++) {
+      const m = v["m" + i];
+      if (m < 0) return {err:["Çəki mənfi ola bilməz.", "Mass cannot be negative."]};
+      if (m > 0) pts.push({i, t:v["t" + i], m, g:v["g" + i]});
+    }
+    if (pts.length < 3) return {err:["Ən azı 3 konsentrat lazımdır.", "At least 3 concentrates are needed."]};
+    for (let j = 0; j < pts.length; j++) {
+      if (pts[j].g < 0 || pts[j].g > 100) return {err:["Cu tərkibi 0 ilə 100 % arasında olmalıdır.", "Cu grade must be between 0 and 100 %."]};
+      if (!(pts[j].t > (j ? pts[j-1].t : 0))) return {err:["Toplam vaxtlar sıfırdan böyük olmalı və konsentratdan konsentrata artmalıdır.", "Cumulative times must be greater than zero and increase from one concentrate to the next."]};
+    }
+    if (!(v.mt > 0) || v.gt < 0 || v.gt > 100) return {err:["Tullantının çəkisi sıfırdan böyük, Cu tərkibi 0–100 % arasında olmalıdır.", "Tails mass must be greater than zero and Cu grade between 0 and 100 %."]};
+    if (v.S <= 0) return {err:["Scale-up əmsalı sıfırdan böyük olmalıdır.", "Scale-up factor must be greater than zero."]};
+    const metT = v.mt * v.gt / 100;
+    const tot = pts.reduce((a, p) => a + p.m * p.g / 100, 0) + metT;
+    if (!(tot > 0)) return {err:["Məhsullarda mis yoxdur. Analizləri yoxlayın.", "There is no copper in the products. Check the assays."]};
+    let c = 0;
+    pts.forEach(p => { p.r = p.m * p.g / 100 / tot * 100; c += p.r; p.cum = c; });
+    const last = c;
+    const sse = (Rm, k) => pts.reduce((a, p) => a + Math.pow(Rm * (1 - Math.exp(-k * p.t)) - p.cum, 2), 0);
+    const bestK = Rm => {
+      let lo = Math.log(0.001), hi = Math.log(50);
+      for (let n = 0; n < 60; n++) {
+        const a = lo + (hi - lo) / 3, b = hi - (hi - lo) / 3;
+        if (sse(Rm, Math.exp(a)) < sse(Rm, Math.exp(b))) hi = b; else lo = a;
+      }
+      return Math.exp((lo + hi) / 2);
+    };
+    let Rm, k;
+    if (v.Rinf > 0) {
+      if (!(v.Rinf > last && v.Rinf <= 100)) return {err:[`R∞ sonuncu toplam bərpadan (${fmt(last,1)} %) böyük və 100 %-dən çox olmamalıdır. Avtomatik tapmaq üçün 0 yazın.`, `R∞ must be above the last cumulative recovery (${fmt(last,1)} %) and not more than 100 %. Enter 0 to find it automatically.`]};
+      Rm = v.Rinf; k = bestK(Rm);
+    } else {
+      let best = Infinity;
+      for (let r = Math.min(100, last + 0.05); r <= 100.0001; r += 0.05) {
+        const kk = bestK(r), e = sse(r, kk);
+        if (e < best) { best = e; Rm = r; k = kk; }
+      }
+    }
+    const rms = Math.sqrt(sse(Rm, k) / pts.length);
+    const mass = pts.reduce((a, p) => a + p.m, 0) + v.mt;
+    const table = {head:[["Məhsul", "Product"], ["Vaxt, dəq", "Time, min"], ["Bərpa, %", "Recovery, %"], ["Toplam, %", "Cumulative, %"], ["Model, %", "Model, %"]], body:[]};
+    pts.forEach(p => table.body.push([(LANG ? "C" : "K") + p.i, fmt(p.t, 1), fmt(p.r, 1), fmt(p.cum, 1), fmt(Rm * (1 - Math.exp(-k * p.t)), 1)]));
+    table.body.push([tr(["Tullantı", "Tails"]), "–", fmt(metT / tot * 100, 1), "–", "–"]);
+    const msgs = [];
+    if (rms > 3) msgs.push({st:"warn", t:["Model nöqtələrə yaxşı oturmur. Filizdə tez və yavaş üzən fraksiyalar ola bilər və ya testdə xəta var.", "The model does not fit the points well. The ore may have fast and slow floating fractions, or there is an error in the test."]});
+    else msgs.push({st:"good", t:[`Model nöqtələrə yaxşı oturur (orta fərq ${fmt(rms,1)} %).`, `The model fits the points well (average deviation ${fmt(rms,1)} %).`]});
+    if (Rm - last > 3) msgs.push({st:"warn", t:["Əyri hələ düzlənməyib, ona görə R∞ etibarlı deyil. Testi daha uzun aparın.", "The curve has not flattened yet, so R∞ is not reliable. Run the test longer."]});
+    return {rows: [
+      {l:["Zavod üçün k (lab k / əmsal)", "Plant k (lab k / factor)"], v:k / v.S, u:U.permin, d:3, main:true},
+      {l:["Laboratoriya k", "Lab k"], v:k, u:U.permin, d:3},
+      {l:["Maksimal bərpa (R∞)", "Maximum recovery (R∞)"], v:Rm, u:"%", d:1},
+      {l:["Sonuncu toplam bərpa", "Last cumulative recovery"], v:last, u:"%", d:1},
+      {l:["Hesablanmış başlanğıc tərkib", "Calculated head grade"], v:tot / mass * 100, u:"% Cu", d:3},
+      {l:["Məhsulların ümumi çəkisi", "Total mass of products"], v:mass, u:U.g, d:1}
+    ], table, msgs};
+  },
+  formulas: [
+    ["Bərpa = məhsulun Cu-su / bütün məhsulların Cu-su × 100", "Recovery = Cu in product / Cu in all products × 100"],
+    ["Model: R = R∞ × (1 − e⁻ᵏᵗ). R∞ və k ən kiçik kvadratlar üsulu ilə tapılır.", "Model: R = R∞ × (1 − e⁻ᵏᵗ). R∞ and k are found by least squares."],
+    ["k zavod = k lab / scale-up əmsalı. Zavod k-sını və R∞-u Kinetika moduluna yazın.", "Plant k = lab k / scale-up factor. Enter the plant k and R∞ in the Kinetics module."],
+    ["Hesablanmış başlanğıc tərkibi qidalandırmanın analizi ilə müqayisə edin. Fərq 5–10 %-dən çoxdursa, testi təkrarlayın.", "Compare the calculated head grade with the feed assay. If they differ by more than 5–10 %, repeat the test."]
+  ]
 }
 ];
 
@@ -560,7 +644,7 @@ if (typeof document !== "undefined") {
           <button type="button" class="reset" id="${m.id}-reset">${tr(UI.reset)}</button>
         </div>
         <div class="cols">
-          <div class="box"><h3>${tr(UI.input)}</h3><div class="fields">
+          <div class="box"><h3>${tr(UI.input)}</h3><div class="fields${m.grid ? " g3" : ""}">
             ${m.inputs.map(i => `<div class="field">
               <label for="${inputId(m, i)}">${tr(i.label)}</label>
               <div class="ctl"><input id="${inputId(m, i)}" type="text" inputmode="decimal" autocomplete="off"><span class="unit">${tr(i.unit)}</span></div>
