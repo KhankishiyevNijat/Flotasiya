@@ -1,6 +1,6 @@
 // Offline support: the app shell is cached on install; pages are fetched from the
 // network first so updates arrive, with the cached copy used when offline.
-const CACHE = "flotasiya-v1";
+const CACHE = "flotasiya-v2";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
