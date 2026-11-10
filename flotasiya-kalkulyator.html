@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
 <style>
-/* Layout: başlıq, modul seçimi (çiplər), sonra iki sütun: solda giriş xanaları, sağda nəticələr. Telefonda bir sütun. */
+/* Layout: başlıq və dil seçimi, modul çipləri, sonra iki sütun: solda giriş xanaları, sağda nəticələr. Telefonda bir sütun. */
 :root {
   --bg: #f2f5f4;
   --surface: #ffffff;
@@ -42,11 +42,19 @@ body {
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   display: flex; flex-direction: column; gap: 20px;
 }
+header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; justify-content: space-between; }
+header > div:first-child { min-width: 0; flex: 1 1 320px; }
 header h1 {
   font-family: var(--font-display); font-weight: 600; font-size: 28px; line-height: 1.15;
   margin: 0 0 6px; text-wrap: balance;
 }
 header p { margin: 0; color: var(--muted); max-width: 65ch; }
+.lang { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.lang button {
+  font: 600 13px var(--font-body); color: var(--muted); background: none; border: 0;
+  padding: 8px 14px; cursor: pointer;
+}
+.lang button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
 nav { display: flex; flex-wrap: wrap; gap: 8px; }
 nav button {
   font: 500 14px var(--font-body); color: var(--fg);
@@ -101,10 +109,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .row.main .v { font-family: var(--font-display); font-size: 22px; color: var(--accent); }
 .msgs { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .msg { border-radius: 6px; padding: 9px 12px; font-size: 14px; border: 1px solid var(--line); background: var(--sunken); }
-.msg::before { font-weight: 600; margin-right: 6px; }
-.msg.good { border-color: var(--good); } .msg.good::before { content: "Uyğundur."; color: var(--good); }
-.msg.warn { border-color: var(--warn); } .msg.warn::before { content: "Diqqət."; color: var(--warn); }
-.msg.bad { border-color: var(--bad); } .msg.bad::before { content: "Problem."; color: var(--bad); }
+.msg b { font-weight: 600; margin-right: 6px; }
+.msg.good { border-color: var(--good); } .msg.good b { color: var(--good); }
+.msg.warn { border-color: var(--warn); } .msg.warn b { color: var(--warn); }
+.msg.bad { border-color: var(--bad); } .msg.bad b { color: var(--bad); }
 .tablewrap { overflow-x: auto; margin-top: 12px; }
 table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 14px; }
 th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -112,130 +120,166 @@ th { color: var(--muted); font-weight: 500; }
 th:first-child, td:first-child { text-align: left; }
 .formulas { color: var(--muted); font-size: 13.5px; }
 .formulas ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
-.formulas code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; color: var(--fg); }
 footer { color: var(--muted); font-size: 13px; max-width: 75ch; }
 </style>
 
 <div class="wrap">
   <header>
-    <h1>Flotasiya Kalkulyatoru</h1>
-    <p>Flotasiya bölməsinin gündəlik hesablamaları. Xanalardakı rəqəmlər nümunədir. Öz zavodunuzun dəyərlərini yazın, nəticə dərhal yenilənir və bu cihazda yadda qalır.</p>
+    <div>
+      <h1 id="h1"></h1>
+      <p id="lead"></p>
+    </div>
+    <div class="lang" role="group" aria-label="Dil / Language">
+      <button type="button" id="lang-az">AZ</button>
+      <button type="button" id="lang-en">EN</button>
+    </div>
   </header>
-  <nav id="nav" role="tablist" aria-label="Hesablama modulları"></nav>
+  <nav id="nav" role="tablist"></nav>
   <main id="panels"></main>
-  <footer>Nəticələr ilkin mühəndis hesablaması üçündür. Avadanlıq seçimindən əvvəl istehsalçının məlumatı və zavodun ölçülmüş göstəriciləri ilə yoxlayın.</footer>
+  <footer id="foot"></footer>
 </div>
 
 <script>
 const G = 9.81;
 const MOTORS = [0.75,1.1,1.5,2.2,3,4,5.5,7.5,11,15,18.5,22,30,37,45,55,75,90,110,132,160,200,250,315,355,400,450,500,560,630,710,800,900,1000];
+let LANG = 0; // 0 = AZ, 1 = EN
+const tr = x => Array.isArray(x) ? x[LANG] : x;
+
+// Units
+const U = {
+  tph: ["t/saat", "t/h"], m3h: ["m³/saat", "m³/h"], m3min: ["m³/dəq", "m³/min"], min: ["dəq", "min"],
+  pcs: ["ədəd", "pcs"], kw: ["kVt", "kW"], gpt: ["q/t", "g/t"], mlmin: ["ml/dəq", "mL/min"],
+  lh: ["L/saat", "L/h"], kgh: ["kq/saat", "kg/h"], kgd: ["kq/gün", "kg/day"], tmo: ["t/ay", "t/month"],
+  h: ["saat", "h"], cms: ["sm/s", "cm/s"], carry: ["t/(saat·m²)", "t/(h·m²)"], lipl: ["t/(saat·m)", "t/(h·m)"],
+  permin: ["1/dəq", "1/min"], mslurry: ["m pulpa", "m slurry"]
+};
+const UI = {
+  h1: ["Flotasiya Kalkulyatoru", "Flotation Calculator"],
+  lead: ["Flotasiya bölməsinin gündəlik hesablamaları. Xanalardakı rəqəmlər nümunədir. Öz zavodunuzun dəyərlərini yazın, nəticə dərhal yenilənir və bu cihazda yadda qalır.",
+         "Everyday calculations for the flotation section. The numbers in the fields are examples. Type your own plant values; results update immediately and are remembered on this device."],
+  foot: ["Nəticələr ilkin mühəndis hesablaması üçündür. Avadanlıq seçimindən əvvəl istehsalçının məlumatı və zavodun ölçülmüş göstəriciləri ilə yoxlayın.",
+         "Results are for preliminary engineering estimates. Check them against vendor data and measured plant figures before selecting equipment."],
+  input: ["Giriş", "Inputs"], result: ["Nəticə", "Results"], formulas: ["Düsturlar", "Formulas"],
+  reset: ["Nümunə dəyərləri qaytar", "Restore example values"],
+  fill: ["Bütün xanalara rəqəm yazın.", "Enter a number in every field."],
+  good: ["Uyğundur.", "OK."], warn: ["Diqqət.", "Check."], bad: ["Problem.", "Problem."],
+  navLabel: ["Hesablama modulları", "Calculation modules"]
+};
 
 const MODS = [
 {
-  id: "pulpa", name: "Pulpa", title: "Pulpa (slurry) hesablaması",
-  intro: "Quru tonnaj və bərk faza faizindən pulpanın sıxlığını, həcmi sərfini və su miqdarını tapır.",
+  id: "pulpa", name: ["Pulpa", "Slurry"], title: ["Pulpa (slurry) hesablaması", "Slurry calculation"],
+  intro: ["Quru tonnaj və bərk faza faizindən pulpanın sıxlığını, həcmi sərfini və su miqdarını tapır.",
+          "Finds slurry density, volumetric flow and water from dry tonnage and percent solids."],
   inputs: [
-    {k:"M", label:"Quru bərk faza", unit:"t/saat", def:1000},
-    {k:"Cw", label:"Bərk faza (çəki ilə)", unit:"%", def:35},
-    {k:"SGs", label:"Bərk fazanın xüsusi çəkisi", unit:"t/m³", def:2.7},
-    {k:"SGl", label:"Mayenin xüsusi çəkisi", unit:"t/m³", def:1.0}
+    {k:"M", label:["Quru bərk faza", "Dry solids"], unit:U.tph, def:1000},
+    {k:"Cw", label:["Bərk faza (çəki ilə)", "Solids by weight"], unit:"%", def:35},
+    {k:"SGs", label:["Bərk fazanın xüsusi çəkisi", "Solids specific gravity"], unit:"t/m³", def:2.7},
+    {k:"SGl", label:["Mayenin xüsusi çəkisi", "Liquid specific gravity"], unit:"t/m³", def:1.0}
   ],
   calc(v) {
-    if (v.Cw <= 0 || v.Cw >= 100) return {err:"Bərk faza faizi 0 ilə 100 arasında olmalıdır."};
-    if (v.SGs <= 0 || v.SGl <= 0 || v.M <= 0) return {err:"Tonnaj və xüsusi çəkilər sıfırdan böyük olmalıdır."};
+    if (v.Cw <= 0 || v.Cw >= 100) return {err:["Bərk faza faizi 0 ilə 100 arasında olmalıdır.", "Percent solids must be between 0 and 100."]};
+    if (v.SGs <= 0 || v.SGl <= 0 || v.M <= 0) return {err:["Tonnaj və xüsusi çəkilər sıfırdan böyük olmalıdır.", "Tonnage and specific gravities must be greater than zero."]};
     const water = v.M * (100 - v.Cw) / v.Cw;
     const vs = v.M / v.SGs, vl = water / v.SGl, q = vs + vl;
     const rho = (v.M + water) / q;
     return {rows: [
-      {l:"Pulpanın həcmi sərfi", v:q, u:"m³/saat", d:0, main:true},
-      {l:"Pulpanın sıxlığı", v:rho, u:"t/m³", d:3},
-      {l:"Həcmi sərf", v:q/60, u:"m³/dəq", d:2},
-      {l:"Həcmi sərf", v:q/3.6, u:"L/s", d:1},
-      {l:"Pulpanın kütlə sərfi", v:v.M + water, u:"t/saat", d:0},
-      {l:"Su", v:vl, u:"m³/saat", d:0},
-      {l:"Bərk faza (həcm ilə)", v:vs/q*100, u:"%", d:1},
-      {l:"Maye : bərk nisbəti (çəki)", v:water/v.M, u:": 1", d:2}
+      {l:["Pulpanın həcmi sərfi", "Slurry volumetric flow"], v:q, u:U.m3h, d:0, main:true},
+      {l:["Pulpanın sıxlığı", "Slurry density"], v:rho, u:"t/m³", d:3},
+      {l:["Həcmi sərf", "Volumetric flow"], v:q/60, u:U.m3min, d:2},
+      {l:["Həcmi sərf", "Volumetric flow"], v:q/3.6, u:"L/s", d:1},
+      {l:["Pulpanın kütlə sərfi", "Slurry mass flow"], v:v.M + water, u:U.tph, d:0},
+      {l:["Su", "Water"], v:vl, u:U.m3h, d:0},
+      {l:["Bərk faza (həcm ilə)", "Solids by volume"], v:vs/q*100, u:"%", d:1},
+      {l:["Maye : bərk nisbəti (çəki)", "Liquid : solid ratio (weight)"], v:water/v.M, u:": 1", d:2}
     ]};
   },
-  formulas: ["Su = M × (100 − Cw) / Cw", "Q = M / SGs + Su / SGl", "ρ = (M + Su) / Q"]
+  formulas: [["Su = M × (100 − Cw) / Cw", "Water = M × (100 − Cw) / Cw"], ["Q = M / SGs + Su / SGl", "Q = M / SGs + Water / SGl"], ["ρ = (M + Su) / Q", "ρ = (M + Water) / Q"]]
 },
 {
-  id: "sixliq", name: "Sıxlıq → % bərk", title: "Sıxlıqdan bərk faza faizi",
-  intro: "Marcy tərəzisi və ya sıxlıqölçənin göstəricisindən bərk faza faizini və quru tonnajı tapır.",
+  id: "sixliq", name: ["Sıxlıq → % bərk", "Density → % solids"], title: ["Sıxlıqdan bərk faza faizi", "Percent solids from density"],
+  intro: ["Marcy tərəzisi və ya sıxlıqölçənin göstəricisindən bərk faza faizini və quru tonnajı tapır.",
+          "Finds percent solids and dry tonnage from a Marcy scale or density gauge reading."],
   inputs: [
-    {k:"rho", label:"Pulpanın ölçülən sıxlığı", unit:"t/m³", def:1.30},
-    {k:"SGs", label:"Bərk fazanın xüsusi çəkisi", unit:"t/m³", def:2.7},
-    {k:"SGl", label:"Mayenin xüsusi çəkisi", unit:"t/m³", def:1.0},
-    {k:"Q", label:"Pulpanın həcmi sərfi", unit:"m³/saat", def:2000, hint:"Sərfölçəndən. Quru tonnajı hesablamaq üçündür."}
+    {k:"rho", label:["Pulpanın ölçülən sıxlığı", "Measured slurry density"], unit:"t/m³", def:1.30},
+    {k:"SGs", label:["Bərk fazanın xüsusi çəkisi", "Solids specific gravity"], unit:"t/m³", def:2.7},
+    {k:"SGl", label:["Mayenin xüsusi çəkisi", "Liquid specific gravity"], unit:"t/m³", def:1.0},
+    {k:"Q", label:["Pulpanın həcmi sərfi", "Slurry volumetric flow"], unit:U.m3h, def:2000,
+      hint:["Sərfölçəndən. Quru tonnajı hesablamaq üçündür.", "From the flowmeter. Used to calculate dry tonnage."]}
   ],
   calc(v) {
-    if (!(v.rho > v.SGl && v.rho < v.SGs)) return {err:"Pulpanın sıxlığı mayenin və bərk fazanın xüsusi çəkiləri arasında olmalıdır."};
+    if (!(v.rho > v.SGl && v.rho < v.SGs)) return {err:["Pulpanın sıxlığı mayenin və bərk fazanın xüsusi çəkiləri arasında olmalıdır.", "Slurry density must lie between the liquid and solids specific gravities."]};
     const cw = 100 * v.SGs * (v.rho - v.SGl) / (v.rho * (v.SGs - v.SGl));
     const cv = 100 * (v.rho - v.SGl) / (v.SGs - v.SGl);
     const dry = v.Q * v.rho * cw / 100;
     return {rows: [
-      {l:"Bərk faza (çəki ilə)", v:cw, u:"%", d:1, main:true},
-      {l:"Bərk faza (həcm ilə)", v:cv, u:"%", d:1},
-      {l:"Quru bərk faza", v:dry, u:"t/saat", d:0},
-      {l:"Su", v:v.Q * v.rho - dry, u:"t/saat", d:0}
+      {l:["Bərk faza (çəki ilə)", "Solids by weight"], v:cw, u:"%", d:1, main:true},
+      {l:["Bərk faza (həcm ilə)", "Solids by volume"], v:cv, u:"%", d:1},
+      {l:["Quru bərk faza", "Dry solids"], v:dry, u:U.tph, d:0},
+      {l:["Su", "Water"], v:v.Q * v.rho - dry, u:U.tph, d:0}
     ]};
   },
-  formulas: ["Cw = 100 × SGs × (ρ − SGl) / (ρ × (SGs − SGl))", "Quru tonnaj = Q × ρ × Cw / 100"]
+  formulas: ["Cw = 100 × SGs × (ρ − SGl) / (ρ × (SGs − SGl))", ["Quru tonnaj = Q × ρ × Cw / 100", "Dry tonnage = Q × ρ × Cw / 100"]]
 },
 {
-  id: "hecm", name: "Kamera həcmi", title: "Kamera həcmi və qalma vaxtı",
-  intro: "Mövcud bankın faktiki qalma vaxtını hesablayır və laboratoriya kinetikasına görə tələb olunan həcmlə müqayisə edir.",
+  id: "hecm", name: ["Kamera həcmi", "Cell volume"], title: ["Kamera həcmi və qalma vaxtı", "Cell volume and residence time"],
+  intro: ["Mövcud bankın faktiki qalma vaxtını hesablayır və laboratoriya kinetikasına görə tələb olunan həcmlə müqayisə edir.",
+          "Calculates the actual residence time of an existing bank and compares it with the volume required by lab kinetics."],
   inputs: [
-    {k:"Q", label:"Pulpanın həcmi sərfi", unit:"m³/saat", def:2230},
-    {k:"V", label:"Bir kameranın həcmi", unit:"m³", def:160},
-    {k:"n", label:"Kameraların sayı", unit:"ədəd", def:6},
-    {k:"air", label:"Aerasiya payı (air holdup)", unit:"%", def:15, hint:"Adətən 10–20 %."},
-    {k:"tlab", label:"Laboratoriya flotasiya vaxtı", unit:"dəq", def:8},
-    {k:"S", label:"Scale-up faktoru", unit:"×", def:2.5, hint:"Adətən 2.0–2.5."}
+    {k:"Q", label:["Pulpanın həcmi sərfi", "Slurry volumetric flow"], unit:U.m3h, def:2230},
+    {k:"V", label:["Bir kameranın həcmi", "Volume of one cell"], unit:"m³", def:160},
+    {k:"n", label:["Kameraların sayı", "Number of cells"], unit:U.pcs, def:6},
+    {k:"air", label:["Aerasiya payı (air holdup)", "Air holdup"], unit:"%", def:15, hint:["Adətən 10–20 %.", "Typically 10–20 %."]},
+    {k:"tlab", label:["Laboratoriya flotasiya vaxtı", "Lab flotation time"], unit:U.min, def:8},
+    {k:"S", label:["Scale-up faktoru", "Scale-up factor"], unit:"×", def:2.5, hint:["Adətən 2.0–2.5.", "Typically 2.0–2.5."]}
   ],
   calc(v) {
-    if (v.Q <= 0 || v.V <= 0 || v.n <= 0) return {err:"Sərf, həcm və kamera sayı sıfırdan böyük olmalıdır."};
-    if (v.air < 0 || v.air >= 100) return {err:"Aerasiya payı 0 ilə 100 arasında olmalıdır."};
+    if (v.Q <= 0 || v.V <= 0 || v.n <= 0) return {err:["Sərf, həcm və kamera sayı sıfırdan böyük olmalıdır.", "Flow, volume and number of cells must be greater than zero."]};
+    if (v.air < 0 || v.air >= 100) return {err:["Aerasiya payı 0 ilə 100 arasında olmalıdır.", "Air holdup must be between 0 and 100."]};
     const eff = v.n * v.V * (1 - v.air/100);
     const t = eff / (v.Q/60);
     const treq = v.tlab * v.S;
     const vreq = v.Q/60 * treq / (1 - v.air/100);
     const nreq = Math.ceil(vreq / v.V - 1e-9);
     const msgs = [];
-    if (t >= treq) msgs.push({st:"good", t:`Faktiki qalma vaxtı tələb olunandan ${fmt(t - treq,1)} dəq çoxdur.`});
-    else msgs.push({st:"bad", t:`Qalma vaxtı ${fmt(treq - t,1)} dəq çatmır. Ən azı ${nreq} kamera lazımdır.`});
-    if (v.n < 5) msgs.push({st:"warn", t:"5-dən az ardıcıl kamera olduqda pulpanın qısa qapanma riski artır."});
+    if (t >= treq) msgs.push({st:"good", t:[`Faktiki qalma vaxtı tələb olunandan ${fmt(t - treq,1)} dəq çoxdur.`, `Actual residence time exceeds the requirement by ${fmt(t - treq,1)} min.`]});
+    else msgs.push({st:"bad", t:[`Qalma vaxtı ${fmt(treq - t,1)} dəq çatmır. Ən azı ${nreq} kamera lazımdır.`, `Residence time is ${fmt(treq - t,1)} min short. At least ${nreq} cells are needed.`]});
+    if (v.n < 5) msgs.push({st:"warn", t:["5-dən az ardıcıl kamera olduqda pulpanın qısa qapanma riski artır.", "With fewer than 5 cells in series the risk of short-circuiting increases."]});
     return {rows: [
-      {l:"Faktiki qalma vaxtı", v:t, u:"dəq", d:1, main:true},
-      {l:"Tələb olunan qalma vaxtı", v:treq, u:"dəq", d:1},
-      {l:"Effektiv pulpa həcmi", v:eff, u:"m³", d:0},
-      {l:"Tələb olunan ümumi həcm", v:vreq, u:"m³", d:0},
-      {l:"Tələb olunan kamera sayı", v:nreq, u:"ədəd", d:0},
-      {l:"Bir kamerada qalma vaxtı", v:t/v.n, u:"dəq", d:2}
+      {l:["Faktiki qalma vaxtı", "Actual residence time"], v:t, u:U.min, d:1, main:true},
+      {l:["Tələb olunan qalma vaxtı", "Required residence time"], v:treq, u:U.min, d:1},
+      {l:["Effektiv pulpa həcmi", "Effective slurry volume"], v:eff, u:"m³", d:0},
+      {l:["Tələb olunan ümumi həcm", "Required total volume"], v:vreq, u:"m³", d:0},
+      {l:["Tələb olunan kamera sayı", "Required number of cells"], v:nreq, u:U.pcs, d:0},
+      {l:["Bir kamerada qalma vaxtı", "Residence time per cell"], v:t/v.n, u:U.min, d:2}
     ], msgs};
   },
-  formulas: ["t = n × V × (1 − φ) / Q", "V tələb = Q × t lab × S / (1 − φ)"]
+  formulas: ["t = n × V × (1 − φ) / Q", ["V tələb = Q × t lab × S / (1 − φ)", "V required = Q × t lab × S / (1 − φ)"]]
 },
 {
-  id: "nasos", name: "Nasos", title: "Pulpa nasosu və boru xətti",
-  intro: "Borudakı sürəti, çökmə sürətini, tam basqını (TDH) və mühərrik gücünü hesablayır.",
+  id: "nasos", name: ["Nasos", "Pump"], title: ["Pulpa nasosu və boru xətti", "Slurry pump and pipeline"],
+  intro: ["Borudakı sürəti, çökmə sürətini, tam basqını (TDH) və mühərrik gücünü hesablayır.",
+          "Calculates pipe velocity, settling velocity, total dynamic head (TDH) and motor power."],
   inputs: [
-    {k:"Q", label:"Pulpanın həcmi sərfi", unit:"m³/saat", def:400},
-    {k:"ff", label:"Köpük faktoru", unit:"×", def:1.0, hint:"Adi pulpa 1.0. Köpüklü konsentrat 1.5–3."},
-    {k:"rho", label:"Pulpanın sıxlığı", unit:"t/m³", def:1.30},
-    {k:"SGs", label:"Bərk fazanın xüsusi çəkisi", unit:"t/m³", def:2.7},
-    {k:"D", label:"Borunun daxili diametri", unit:"mm", def:200},
-    {k:"L", label:"Borunun uzunluğu", unit:"m", def:120},
-    {k:"Hs", label:"Statik hündürlük", unit:"m", def:15},
-    {k:"K", label:"Yerli müqavimət əmsallarının cəmi (ΣK)", unit:"–", def:5, hint:"Dirsək ≈ 0.3–0.9, klapan ≈ 0.2–2, çıxış 1.0."},
-    {k:"eps", label:"Borunun kələ-kötürlüyü", unit:"mm", def:0.05, hint:"Polad ≈ 0.05, HDPE ≈ 0.01, rezin örtük ≈ 0.15."},
-    {k:"FL", label:"Durand əmsalı (FL)", unit:"–", def:1.0, hint:"İncə pulpa 0.7–1.0, iri dənəli 1.0–1.4."},
-    {k:"eta", label:"Nasosun FİƏ-si (pulpa ilə)", unit:"%", def:65},
-    {k:"sf", label:"Mühərrik ehtiyat əmsalı", unit:"×", def:1.15}
+    {k:"Q", label:["Pulpanın həcmi sərfi", "Slurry volumetric flow"], unit:U.m3h, def:400},
+    {k:"ff", label:["Köpük faktoru", "Froth factor"], unit:"×", def:1.0, hint:["Adi pulpa 1.0. Köpüklü konsentrat 1.5–3.", "Plain slurry 1.0. Frothy concentrate 1.5–3."]},
+    {k:"rho", label:["Pulpanın sıxlığı", "Slurry density"], unit:"t/m³", def:1.30},
+    {k:"SGs", label:["Bərk fazanın xüsusi çəkisi", "Solids specific gravity"], unit:"t/m³", def:2.7},
+    {k:"D", label:["Borunun daxili diametri", "Pipe inside diameter"], unit:"mm", def:200},
+    {k:"L", label:["Borunun uzunluğu", "Pipe length"], unit:"m", def:120},
+    {k:"Hs", label:["Statik hündürlük", "Static head"], unit:"m", def:15},
+    {k:"K", label:["Yerli müqavimət əmsallarının cəmi (ΣK)", "Sum of fitting loss coefficients (ΣK)"], unit:"–", def:5,
+      hint:["Dirsək ≈ 0.3–0.9, klapan ≈ 0.2–2, çıxış 1.0.", "Elbow ≈ 0.3–0.9, valve ≈ 0.2–2, exit 1.0."]},
+    {k:"eps", label:["Borunun kələ-kötürlüyü", "Pipe roughness"], unit:"mm", def:0.05,
+      hint:["Polad ≈ 0.05, HDPE ≈ 0.01, rezin örtük ≈ 0.15.", "Steel ≈ 0.05, HDPE ≈ 0.01, rubber lined ≈ 0.15."]},
+    {k:"FL", label:["Durand əmsalı (FL)", "Durand factor (FL)"], unit:"–", def:1.0,
+      hint:["İncə pulpa 0.7–1.0, iri dənəli 1.0–1.4.", "Fine slurry 0.7–1.0, coarse 1.0–1.4."]},
+    {k:"eta", label:["Nasosun FİƏ-si (pulpa ilə)", "Pump efficiency (on slurry)"], unit:"%", def:65},
+    {k:"sf", label:["Mühərrik ehtiyat əmsalı", "Motor safety factor"], unit:"×", def:1.15}
   ],
   calc(v) {
-    if (v.Q <= 0 || v.D <= 0 || v.rho <= 0 || v.eta <= 0 || v.ff <= 0 || v.L < 0) return {err:"Sərf, diametr, sıxlıq, FİƏ və köpük faktoru sıfırdan böyük olmalıdır."};
-    if (v.SGs <= 1) return {err:"Bərk fazanın xüsusi çəkisi 1-dən böyük olmalıdır."};
+    if (v.Q <= 0 || v.D <= 0 || v.rho <= 0 || v.eta <= 0 || v.ff <= 0 || v.L < 0) return {err:["Sərf, diametr, sıxlıq, FİƏ və köpük faktoru sıfırdan böyük olmalıdır.", "Flow, diameter, density, efficiency and froth factor must be greater than zero."]};
+    if (v.SGs <= 1) return {err:["Bərk fazanın xüsusi çəkisi 1-dən böyük olmalıdır.", "Solids specific gravity must be greater than 1."]};
     const qd = v.Q * v.ff, qs = qd / 3600, D = v.D / 1000;
     const vel = qs / (Math.PI * D * D / 4);
     const rho = v.rho * 1000;
@@ -249,162 +293,223 @@ const MODS = [
     const motor = MOTORS.find(m => m >= Pm);
     const VL = v.FL * Math.sqrt(2 * G * D * (v.SGs - 1));
     const msgs = [];
-    if (vel < VL) msgs.push({st:"bad", t:"Sürət çökmə sürətindən aşağıdır, boru tıxana bilər. Diametri kiçildin və ya sərfi artırın."});
-    else if (vel < 1.1 * VL) msgs.push({st:"warn", t:"Sürət çökmə sürətinə çox yaxındır. Ən azı 10 % ehtiyat saxlayın."});
-    else if (vel > 4.5) msgs.push({st:"warn", t:"Sürət yüksəkdir, boru və nasos tez aşınacaq. Diametri böyütməyi düşünün."});
-    else msgs.push({st:"good", t:"Sürət çökmə sürətindən yuxarıdır və aşınma həddindən aşağıdır."});
+    if (vel < VL) msgs.push({st:"bad", t:["Sürət çökmə sürətindən aşağıdır, boru tıxana bilər. Diametri kiçildin və ya sərfi artırın.", "Velocity is below the settling velocity, so the pipe may sand up. Reduce the diameter or increase the flow."]});
+    else if (vel < 1.1 * VL) msgs.push({st:"warn", t:["Sürət çökmə sürətinə çox yaxındır. Ən azı 10 % ehtiyat saxlayın.", "Velocity is very close to the settling velocity. Keep at least a 10 % margin."]});
+    else if (vel > 4.5) msgs.push({st:"warn", t:["Sürət yüksəkdir, boru və nasos tez aşınacaq. Diametri böyütməyi düşünün.", "Velocity is high, so pipe and pump wear will be fast. Consider a larger diameter."]});
+    else msgs.push({st:"good", t:["Sürət çökmə sürətindən yuxarıdır və aşınma həddindən aşağıdır.", "Velocity is above the settling velocity and below the wear limit."]});
     return {rows: [
-      {l:"Tam basqı (TDH)", v:H, u:"m pulpa", d:1, main:true},
-      {l:"Layihə sərfi (köpük faktoru ilə)", v:qd, u:"m³/saat", d:0},
-      {l:"Borudakı sürət", v:vel, u:"m/s", d:2},
-      {l:"Çökmə sürəti (Durand)", v:VL, u:"m/s", d:2},
-      {l:"Sürtünmə itkisi", v:hf, u:"m", d:1},
-      {l:"Yerli itkilər", v:hm, u:"m", d:1},
-      {l:"Sürtünmə əmsalı (f)", v:f, u:"", d:4},
-      {l:"Valdakı güc", v:P, u:"kVt", d:1},
-      {l:"Mühərrik gücü (ehtiyatla)", v:Pm, u:"kVt", d:1},
-      {l:"Standart mühərrik", v:motor ?? NaN, u:"kVt", d: motor && motor < 10 ? 1 : 0}
+      {l:["Tam basqı (TDH)", "Total dynamic head (TDH)"], v:H, u:U.mslurry, d:1, main:true},
+      {l:["Layihə sərfi (köpük faktoru ilə)", "Design flow (with froth factor)"], v:qd, u:U.m3h, d:0},
+      {l:["Borudakı sürət", "Pipe velocity"], v:vel, u:"m/s", d:2},
+      {l:["Çökmə sürəti (Durand)", "Settling velocity (Durand)"], v:VL, u:"m/s", d:2},
+      {l:["Sürtünmə itkisi", "Friction loss"], v:hf, u:"m", d:1},
+      {l:["Yerli itkilər", "Fitting losses"], v:hm, u:"m", d:1},
+      {l:["Sürtünmə əmsalı (f)", "Friction factor (f)"], v:f, u:"", d:4},
+      {l:["Valdakı güc", "Shaft power"], v:P, u:U.kw, d:1},
+      {l:["Mühərrik gücü (ehtiyatla)", "Motor power (with safety factor)"], v:Pm, u:U.kw, d:1},
+      {l:["Standart mühərrik", "Standard motor size"], v:motor ?? NaN, u:U.kw, d: motor && motor < 10 ? 1 : 0}
     ], msgs};
   },
   formulas: [
     "v = Q × FF / (π × D² / 4)",
     "VL = FL × √(2 × g × D × (SGs − 1))",
-    "f: Swamee–Jain düsturu ilə, hf = f × L / D × v² / 2g",
-    "TDH = H statik + hf + ΣK × v² / 2g",
+    ["f: Swamee–Jain düsturu ilə, hf = f × L / D × v² / 2g", "f: by the Swamee–Jain equation, hf = f × L / D × v² / 2g"],
+    ["TDH = H statik + hf + ΣK × v² / 2g", "TDH = H static + hf + ΣK × v² / 2g"],
     "P = ρ × g × Q × TDH / η",
-    "Sürtünmə suyun özlülüyü ilə hesablanır. Qatı və ya gilli pulpada real itki daha böyük olur. Bərk fazaya görə nasosun basqı düzəlişi (HR) daxil deyil."
+    ["Sürtünmə suyun özlülüyü ilə hesablanır. Qatı və ya gilli pulpada real itki daha böyük olur. Bərk fazaya görə nasosun basqı düzəlişi (HR) daxil deyil.",
+     "Friction uses the viscosity of water. In thick or clayey slurry the real loss is higher. The pump head derating for solids (HR) is not included."]
   ]
 },
 {
-  id: "balans", name: "Bərpa və çıxım", title: "Metallurji balans (iki məhsul düsturu)",
-  intro: "Qidalandırma, konsentrat və tullantının tərkibindən bərpanı, konsentrat çıxımını və tonnajları tapır.",
+  id: "balans", name: ["Bərpa və çıxım", "Recovery & mass pull"], title: ["Metallurji balans (iki məhsul düsturu)", "Metallurgical balance (two-product formula)"],
+  intro: ["Qidalandırma, konsentrat və tullantının tərkibindən bərpanı, konsentrat çıxımını və tonnajları tapır.",
+          "Finds recovery, mass pull and tonnages from feed, concentrate and tailings grades."],
   inputs: [
-    {k:"F", label:"Qidalandırma (quru)", unit:"t/saat", def:1000},
-    {k:"f", label:"Qidalandırmanın tərkibi", unit:"%", def:0.60},
-    {k:"c", label:"Konsentratın tərkibi", unit:"%", def:25},
-    {k:"t", label:"Tullantının tərkibi", unit:"%", def:0.06}
+    {k:"F", label:["Qidalandırma (quru)", "Feed (dry)"], unit:U.tph, def:1000},
+    {k:"f", label:["Qidalandırmanın tərkibi", "Feed grade"], unit:"%", def:0.60},
+    {k:"c", label:["Konsentratın tərkibi", "Concentrate grade"], unit:"%", def:25},
+    {k:"t", label:["Tullantının tərkibi", "Tailings grade"], unit:"%", def:0.06}
   ],
   calc(v) {
-    if (!(v.c > v.f && v.f > v.t && v.t >= 0)) return {err:"Tərkiblər belə sıralanmalıdır: konsentrat > qidalandırma > tullantı."};
+    if (!(v.c > v.f && v.f > v.t && v.t >= 0)) return {err:["Tərkiblər belə sıralanmalıdır: konsentrat > qidalandırma > tullantı.", "Grades must be ordered: concentrate > feed > tailings."]};
     const pull = (v.f - v.t) / (v.c - v.t);
     const R = v.c * (v.f - v.t) / (v.f * (v.c - v.t)) * 100;
     const C = v.F * pull;
     return {rows: [
-      {l:"Bərpa (recovery)", v:R, u:"%", d:2, main:true},
-      {l:"Konsentrat çıxımı (mass pull)", v:pull*100, u:"%", d:2},
-      {l:"Konsentrat", v:C, u:"t/saat", d:2},
-      {l:"Tullantı", v:v.F - C, u:"t/saat", d:1},
-      {l:"Konsentratdakı metal", v:C * v.c / 100, u:"t/saat", d:3},
-      {l:"Tullantıya itən metal", v:(v.F - C) * v.t / 100, u:"t/saat", d:3},
-      {l:"Zənginləşmə nisbəti (c / f)", v:v.c / v.f, u:"×", d:1},
-      {l:"Konsentrasiya nisbəti (F / C)", v:1 / pull, u:"×", d:1}
+      {l:["Bərpa (recovery)", "Recovery"], v:R, u:"%", d:2, main:true},
+      {l:["Konsentrat çıxımı (mass pull)", "Mass pull"], v:pull*100, u:"%", d:2},
+      {l:["Konsentrat", "Concentrate"], v:C, u:U.tph, d:2},
+      {l:["Tullantı", "Tailings"], v:v.F - C, u:U.tph, d:1},
+      {l:["Konsentratdakı metal", "Metal in concentrate"], v:C * v.c / 100, u:U.tph, d:3},
+      {l:["Tullantıya itən metal", "Metal lost to tailings"], v:(v.F - C) * v.t / 100, u:U.tph, d:3},
+      {l:["Zənginləşmə nisbəti (c / f)", "Enrichment ratio (c / f)"], v:v.c / v.f, u:"×", d:1},
+      {l:["Konsentrasiya nisbəti (F / C)", "Concentration ratio (F / C)"], v:1 / pull, u:"×", d:1}
     ]};
   },
-  formulas: ["Çıxım = (f − t) / (c − t)", "Bərpa = c × (f − t) / (f × (c − t)) × 100"]
+  formulas: [["Çıxım = (f − t) / (c − t)", "Mass pull = (f − t) / (c − t)"], ["Bərpa = c × (f − t) / (f × (c − t)) × 100", "Recovery = c × (f − t) / (f × (c − t)) × 100"]]
 },
 {
-  id: "reagent", name: "Reagent", title: "Reagent dozalanması",
-  intro: "Dozanı (q/t) dozalama nasosunun sərfinə çevirir və gündəlik sərfi, çənin neçə saata bitəcəyini göstərir.",
+  id: "cu", name: ["Cu bərpası (oksid / sulfid)", "Cu recovery (oxide / sulphide)"],
+  title: ["Cu bərpası: ümumi, sulfid və oksid", "Cu recovery: total, sulphide and oxide"],
+  intro: ["Qidalandırma və tullantının ümumi Cu və oksid Cu analizlərindən ümumi, sulfid və oksid mis üzrə bərpanı ayrı-ayrı hesablayır. Sulfid Cu = ümumi Cu − oksid Cu.",
+          "Calculates recovery separately for total, sulphide and oxide copper from the total Cu and oxide Cu assays of feed and tailings. Sulphide Cu = total Cu − oxide Cu."],
   inputs: [
-    {k:"T", label:"Quru tonnaj", unit:"t/saat", def:1000},
-    {k:"dose", label:"Doza", unit:"q/t", def:20},
-    {k:"conc", label:"Məhlulun qatılığı (w/v)", unit:"%", def:10, hint:"10 % = litrdə 100 q. Durulaşdırılmamış maye üçün sıxlıq × 100 yazın (MIBC ≈ 81)."},
-    {k:"tank", label:"Reagent çəninin həcmi", unit:"m³", def:5}
+    {k:"F", label:["Qidalandırma (quru)", "Feed (dry)"], unit:U.tph, def:1000},
+    {k:"fT", label:["Qidalandırma: ümumi Cu (CuT)", "Feed: total Cu (CuT)"], unit:"%", def:0.60},
+    {k:"fOx", label:["Qidalandırma: oksid Cu (CuOx)", "Feed: oxide Cu (CuOx)"], unit:"%", def:0.08,
+      hint:["Turşuda həll olan mis analizi.", "Acid-soluble copper assay."]},
+    {k:"tT", label:["Tullantı: ümumi Cu (CuT)", "Tailings: total Cu (CuT)"], unit:"%", def:0.08},
+    {k:"tOx", label:["Tullantı: oksid Cu (CuOx)", "Tailings: oxide Cu (CuOx)"], unit:"%", def:0.045},
+    {k:"cT", label:["Konsentrat: ümumi Cu", "Concentrate: total Cu"], unit:"%", def:25,
+      hint:["Konsentrat çıxımını tapmaq üçün lazımdır.", "Needed to find the mass pull."]}
   ],
   calc(v) {
-    if (v.T <= 0 || v.dose < 0 || v.conc <= 0) return {err:"Tonnaj və qatılıq sıfırdan böyük olmalıdır."};
+    if (!(v.cT > v.fT && v.fT > v.tT && v.tT >= 0)) return {err:["Ümumi Cu belə sıralanmalıdır: konsentrat > qidalandırma > tullantı.", "Total Cu must be ordered: concentrate > feed > tailings."]};
+    if (v.fOx < 0 || v.tOx < 0 || v.fOx > v.fT || v.tOx > v.tT) return {err:["Oksid Cu mənfi və ya ümumi Cu-dan böyük ola bilməz.", "Oxide Cu cannot be negative or greater than total Cu."]};
+    if (v.F <= 0) return {err:["Tonnaj sıfırdan böyük olmalıdır.", "Tonnage must be greater than zero."]};
+    const pull = (v.fT - v.tT) / (v.cT - v.tT);
+    const C = v.F * pull, T = v.F - C;
+    const fS = v.fT - v.fOx, tS = v.tT - v.tOx;
+    const rT = v.cT * pull / v.fT * 100;
+    const rOx = v.fOx > 0 ? (1 - (1 - pull) * v.tOx / v.fOx) * 100 : NaN;
+    const rS = fS > 0 ? (1 - (1 - pull) * tS / fS) * 100 : NaN;
+    const cOx = (v.fOx - (1 - pull) * v.tOx) / pull;
+    const oxShare = v.fOx / v.fT * 100;
+    const msgs = [];
+    if (rOx < 0 || rS < 0) msgs.push({st:"bad", t:["Bərpa mənfi alınır: tullantıdakı tərkib qidalandırmadan çoxdur. Nümunələri və analizləri yoxlayın.", "A recovery is negative: the tailings carry more than the feed. Check the samples and assays."]});
+    if (oxShare > 10) msgs.push({st:"warn", t:[`Qidalandırmadakı misin ${fmt(oxShare,0)} %-i oksid formasındadır. Oksid mis adi sulfid flotasiyasında zəif tutulur, buna görə ümumi bərpa aşağı düşür.`, `${fmt(oxShare,0)} % of the copper in the feed is oxide. Oxide copper floats poorly in standard sulphide flotation, which pulls total recovery down.`]});
+    return {rows: [
+      {l:["Ümumi Cu bərpası", "Total Cu recovery"], v:rT, u:"%", d:2, main:true},
+      {l:["Sulfid Cu bərpası", "Sulphide Cu recovery"], v:rS, u:"%", d:2},
+      {l:["Oksid Cu bərpası", "Oxide Cu recovery"], v:rOx, u:"%", d:2},
+      {l:["Konsentrat çıxımı (mass pull)", "Mass pull"], v:pull*100, u:"%", d:2},
+      {l:["Konsentrat", "Concentrate"], v:C, u:U.tph, d:2},
+      {l:["Qidalandırmada sulfid Cu", "Sulphide Cu in feed"], v:fS, u:"%", d:3},
+      {l:["Tullantıda sulfid Cu", "Sulphide Cu in tailings"], v:tS, u:"%", d:3},
+      {l:["Qidalandırmada oksidin payı (CuOx / CuT)", "Oxide share in feed (CuOx / CuT)"], v:oxShare, u:"%", d:1},
+      {l:["Tullantıda oksidin payı (CuOx / CuT)", "Oxide share in tailings (CuOx / CuT)"], v:v.tOx / v.tT * 100, u:"%", d:1},
+      {l:["Konsentratda oksid Cu (balansdan)", "Oxide Cu in concentrate (from balance)"], v:cOx, u:"%", d:2},
+      {l:["Tullantıya itən sulfid Cu", "Sulphide Cu lost to tailings"], v:T * tS / 100, u:U.tph, d:3},
+      {l:["Tullantıya itən oksid Cu", "Oxide Cu lost to tailings"], v:T * v.tOx / 100, u:U.tph, d:3}
+    ], msgs};
+  },
+  formulas: [
+    ["Sulfid Cu = CuT − CuOx", "Sulphide Cu = CuT − CuOx"],
+    ["Çıxım = (f − t) / (c − t), ümumi Cu üzrə", "Mass pull = (f − t) / (c − t), on total Cu"],
+    ["Ümumi bərpa = c × Çıxım / f × 100", "Total recovery = c × Mass pull / f × 100"],
+    ["Oksid və ya sulfid bərpası = (1 − (1 − Çıxım) × t / f) × 100, həmin formanın f və t dəyərləri ilə", "Oxide or sulphide recovery = (1 − (1 − Mass pull) × t / f) × 100, using f and t of that species"]
+  ]
+},
+{
+  id: "reagent", name: ["Reagent", "Reagent"], title: ["Reagent dozalanması", "Reagent dosing"],
+  intro: ["Dozanı (q/t) dozalama nasosunun sərfinə çevirir və gündəlik sərfi, çənin neçə saata bitəcəyini göstərir.",
+          "Converts a dose (g/t) into dosing pump flow and shows daily consumption and how long the tank lasts."],
+  inputs: [
+    {k:"T", label:["Quru tonnaj", "Dry tonnage"], unit:U.tph, def:1000},
+    {k:"dose", label:["Doza", "Dose"], unit:U.gpt, def:20},
+    {k:"conc", label:["Məhlulun qatılığı (w/v)", "Solution strength (w/v)"], unit:"%", def:10,
+      hint:["10 % = litrdə 100 q. Durulaşdırılmamış maye üçün sıxlıq × 100 yazın (MIBC ≈ 81).", "10 % = 100 g per litre. For a neat liquid enter density × 100 (MIBC ≈ 81)."]},
+    {k:"tank", label:["Reagent çəninin həcmi", "Reagent tank volume"], unit:"m³", def:5}
+  ],
+  calc(v) {
+    if (v.T <= 0 || v.dose < 0 || v.conc <= 0) return {err:["Tonnaj və qatılıq sıfırdan böyük olmalıdır.", "Tonnage and strength must be greater than zero."]};
     const gmin = v.dose * v.T / 60;
     const mlmin = gmin / (v.conc / 100);
     const lh = mlmin * 60 / 1000;
     return {rows: [
-      {l:"Dozalama nasosunun sərfi", v:mlmin, u:"ml/dəq", d:0, main:true},
-      {l:"Məhlul sərfi", v:lh, u:"L/saat", d:1},
-      {l:"Təmiz reagent", v:gmin * 60 / 1000, u:"kq/saat", d:2},
-      {l:"Gündəlik sərf (24 saat)", v:gmin * 1440 / 1000, u:"kq/gün", d:0},
-      {l:"Aylıq sərf (30 gün)", v:gmin * 1440 * 30 / 1e6, u:"t/ay", d:2},
-      {l:"Çən bu qədər çatır", v: lh > 0 ? v.tank * 1000 / lh : NaN, u:"saat", d:1}
+      {l:["Dozalama nasosunun sərfi", "Dosing pump flow"], v:mlmin, u:U.mlmin, d:0, main:true},
+      {l:["Məhlul sərfi", "Solution flow"], v:lh, u:U.lh, d:1},
+      {l:["Təmiz reagent", "Pure reagent"], v:gmin * 60 / 1000, u:U.kgh, d:2},
+      {l:["Gündəlik sərf (24 saat)", "Daily consumption (24 h)"], v:gmin * 1440 / 1000, u:U.kgd, d:0},
+      {l:["Aylıq sərf (30 gün)", "Monthly consumption (30 days)"], v:gmin * 1440 * 30 / 1e6, u:U.tmo, d:2},
+      {l:["Çən bu qədər çatır", "Tank lasts"], v: lh > 0 ? v.tank * 1000 / lh : NaN, u:U.h, d:1}
     ]};
   },
-  formulas: ["Reagent (q/dəq) = Doza × T / 60", "Sərf (ml/dəq) = Reagent / (Qatılıq / 100)"]
+  formulas: [["Reagent (q/dəq) = Doza × T / 60", "Reagent (g/min) = Dose × T / 60"], ["Sərf (ml/dəq) = Reagent / (Qatılıq / 100)", "Flow (mL/min) = Reagent / (Strength / 100)"]]
 },
 {
-  id: "hava", name: "Hava və köpük", title: "Hava sərfi və köpük yüklənməsi",
-  intro: "Bir kamera üçün səthi hava sürətini (Jg), köpük daşıma yükünü və lip loading-i yoxlayır.",
+  id: "hava", name: ["Hava və köpük", "Air & froth"], title: ["Hava sərfi və köpük yüklənməsi", "Air rate and froth loading"],
+  intro: ["Bir kamera üçün səthi hava sürətini (Jg), köpük daşıma yükünü və lip loading-i yoxlayır.",
+          "Checks superficial gas velocity (Jg), froth carrying rate and lip loading for one cell."],
   inputs: [
-    {k:"air", label:"Kameraya verilən hava", unit:"m³/dəq", def:20},
-    {k:"A", label:"Kameranın en kəsik sahəsi", unit:"m²", def:33},
-    {k:"Af", label:"Köpük səthinin sahəsi", unit:"m²", def:25, hint:"En kəsik sahəsindən crowder və novların tutduğu sahə çıxılır."},
-    {k:"lip", label:"Köpük astanasının (lip) uzunluğu", unit:"m", def:30},
-    {k:"C", label:"Bu kameradan çıxan konsentrat (quru)", unit:"t/saat", def:15}
+    {k:"air", label:["Kameraya verilən hava", "Air to the cell"], unit:U.m3min, def:20},
+    {k:"A", label:["Kameranın en kəsik sahəsi", "Cell cross-sectional area"], unit:"m²", def:33},
+    {k:"Af", label:["Köpük səthinin sahəsi", "Froth surface area"], unit:"m²", def:25,
+      hint:["En kəsik sahəsindən crowder və novların tutduğu sahə çıxılır.", "Cross-sectional area minus the area taken by the crowder and launders."]},
+    {k:"lip", label:["Köpük astanasının (lip) uzunluğu", "Froth lip length"], unit:"m", def:30},
+    {k:"C", label:["Bu kameradan çıxan konsentrat (quru)", "Concentrate from this cell (dry)"], unit:U.tph, def:15}
   ],
   calc(v) {
-    if (v.A <= 0 || v.Af <= 0 || v.lip <= 0 || v.air < 0 || v.C < 0) return {err:"Sahələr və lip uzunluğu sıfırdan böyük olmalıdır."};
+    if (v.A <= 0 || v.Af <= 0 || v.lip <= 0 || v.air < 0 || v.C < 0) return {err:["Sahələr və lip uzunluğu sıfırdan böyük olmalıdır.", "Areas and lip length must be greater than zero."]};
     const jg = v.air / 60 / v.A * 100;
     const cr = v.C / v.Af, ll = v.C / v.lip;
     const msgs = [];
-    if (jg < 0.8) msgs.push({st:"warn", t:"Jg aşağıdır (0.8 sm/s-dən az). Bərpa hava çatışmazlığından məhdudlaşa bilər."});
-    else if (jg > 2.0) msgs.push({st:"warn", t:"Jg yüksəkdir (2.0 sm/s-dən çox). Köpük dayanıqsız olur, pustoy süxur konsentrata keçir."});
-    else msgs.push({st:"good", t:"Jg tipik 0.8–2.0 sm/s aralığındadır."});
-    if (ll > 1.5) msgs.push({st:"warn", t:"Lip loading 1.5 t/(saat·m)-dən çoxdur. Əlavə iç nov (launder) lazım ola bilər."});
-    if (cr > 2.5) msgs.push({st:"warn", t:"Köpük daşıma yükü yüksəkdir. Köpük səthi konsentratı çıxarmağa çatmaya bilər."});
+    if (jg < 0.8) msgs.push({st:"warn", t:["Jg aşağıdır (0.8 sm/s-dən az). Bərpa hava çatışmazlığından məhdudlaşa bilər.", "Jg is low (below 0.8 cm/s). Recovery may be limited by lack of air."]});
+    else if (jg > 2.0) msgs.push({st:"warn", t:["Jg yüksəkdir (2.0 sm/s-dən çox). Köpük dayanıqsız olur, pustoy süxur konsentrata keçir.", "Jg is high (above 2.0 cm/s). The froth becomes unstable and gangue reports to concentrate."]});
+    else msgs.push({st:"good", t:["Jg tipik 0.8–2.0 sm/s aralığındadır.", "Jg is within the typical 0.8–2.0 cm/s range."]});
+    if (ll > 1.5) msgs.push({st:"warn", t:["Lip loading 1.5 t/(saat·m)-dən çoxdur. Əlavə iç nov (launder) lazım ola bilər.", "Lip loading is above 1.5 t/(h·m). An extra internal launder may be needed."]});
+    if (cr > 2.5) msgs.push({st:"warn", t:["Köpük daşıma yükü yüksəkdir. Köpük səthi konsentratı çıxarmağa çatmaya bilər.", "Froth carrying rate is high. The froth surface may not be enough to remove the concentrate."]});
     return {rows: [
-      {l:"Səthi hava sürəti (Jg)", v:jg, u:"sm/s", d:2, main:true},
-      {l:"Köpük daşıma yükü", v:cr, u:"t/(saat·m²)", d:2},
-      {l:"Lip loading", v:ll, u:"t/(saat·m)", d:2},
-      {l:"Hava sərfi", v:v.air * 60, u:"m³/saat", d:0}
+      {l:["Səthi hava sürəti (Jg)", "Superficial gas velocity (Jg)"], v:jg, u:U.cms, d:2, main:true},
+      {l:["Köpük daşıma yükü", "Froth carrying rate"], v:cr, u:U.carry, d:2},
+      {l:["Lip loading", "Lip loading"], v:ll, u:U.lipl, d:2},
+      {l:["Hava sərfi", "Air flow"], v:v.air * 60, u:U.m3h, d:0}
     ], msgs};
   },
-  formulas: ["Jg = Hava / A", "Daşıma yükü = Konsentrat / Köpük sahəsi", "Lip loading = Konsentrat / Lip uzunluğu",
-    "Tipik daşıma yükü: rougher 0.8–1.5, scavenger 0.3–0.8, cleaner 1.0–2.0 t/(saat·m²)."]
+  formulas: [["Jg = Hava / A", "Jg = Air / A"], ["Daşıma yükü = Konsentrat / Köpük sahəsi", "Carrying rate = Concentrate / Froth area"], ["Lip loading = Konsentrat / Lip uzunluğu", "Lip loading = Concentrate / Lip length"],
+    ["Tipik daşıma yükü: rougher 0.8–1.5, scavenger 0.3–0.8, cleaner 1.0–2.0 t/(saat·m²).", "Typical carrying rate: rougher 0.8–1.5, scavenger 0.3–0.8, cleaner 1.0–2.0 t/(h·m²)."]]
 },
 {
-  id: "su", name: "Durulaşdırma", title: "Durulaşdırma suyu",
-  intro: "Pulpanı istənilən bərk faza faizinə endirmək üçün lazım olan suyu tapır. Məsələn, cleaner qidalandırması üçün.",
+  id: "su", name: ["Durulaşdırma", "Dilution"], title: ["Durulaşdırma suyu", "Dilution water"],
+  intro: ["Pulpanı istənilən bərk faza faizinə endirmək üçün lazım olan suyu tapır. Məsələn, cleaner qidalandırması üçün.",
+          "Finds the water needed to dilute a slurry to a target percent solids, for example for cleaner feed."],
   inputs: [
-    {k:"M", label:"Quru bərk faza", unit:"t/saat", def:100},
-    {k:"C1", label:"İndiki bərk faza", unit:"%", def:35},
-    {k:"C2", label:"Hədəf bərk faza", unit:"%", def:20},
-    {k:"SGs", label:"Bərk fazanın xüsusi çəkisi", unit:"t/m³", def:2.7}
+    {k:"M", label:["Quru bərk faza", "Dry solids"], unit:U.tph, def:100},
+    {k:"C1", label:["İndiki bərk faza", "Current percent solids"], unit:"%", def:35},
+    {k:"C2", label:["Hədəf bərk faza", "Target percent solids"], unit:"%", def:20},
+    {k:"SGs", label:["Bərk fazanın xüsusi çəkisi", "Solids specific gravity"], unit:"t/m³", def:2.7}
   ],
   calc(v) {
-    if (!(v.C1 > 0 && v.C1 < 100 && v.C2 > 0 && v.C2 < 100)) return {err:"Bərk faza faizləri 0 ilə 100 arasında olmalıdır."};
-    if (v.C2 >= v.C1) return {err:"Hədəf faiz indikindən kiçik olmalıdır. Qatılaşdırmaq üçün su əlavə edilmir."};
-    if (v.M <= 0 || v.SGs <= 0) return {err:"Tonnaj və xüsusi çəki sıfırdan böyük olmalıdır."};
+    if (!(v.C1 > 0 && v.C1 < 100 && v.C2 > 0 && v.C2 < 100)) return {err:["Bərk faza faizləri 0 ilə 100 arasında olmalıdır.", "Percent solids must be between 0 and 100."]};
+    if (v.C2 >= v.C1) return {err:["Hədəf faiz indikindən kiçik olmalıdır. Qatılaşdırmaq üçün su əlavə edilmir.", "The target must be lower than the current value. Water is not added to thicken a slurry."]};
+    if (v.M <= 0 || v.SGs <= 0) return {err:["Tonnaj və xüsusi çəki sıfırdan böyük olmalıdır.", "Tonnage and specific gravity must be greater than zero."]};
     const w1 = v.M * (100 - v.C1) / v.C1, w2 = v.M * (100 - v.C2) / v.C2;
     const q1 = v.M / v.SGs + w1, q2 = v.M / v.SGs + w2;
     return {rows: [
-      {l:"Əlavə ediləcək su", v:w2 - w1, u:"m³/saat", d:1, main:true},
-      {l:"Əvvəlki pulpa sərfi", v:q1, u:"m³/saat", d:0},
-      {l:"Yeni pulpa sərfi", v:q2, u:"m³/saat", d:0},
-      {l:"Yeni pulpanın sıxlığı", v:(v.M + w2) / q2, u:"t/m³", d:3}
+      {l:["Əlavə ediləcək su", "Water to add"], v:w2 - w1, u:U.m3h, d:1, main:true},
+      {l:["Əvvəlki pulpa sərfi", "Slurry flow before"], v:q1, u:U.m3h, d:0},
+      {l:["Yeni pulpa sərfi", "Slurry flow after"], v:q2, u:U.m3h, d:0},
+      {l:["Yeni pulpanın sıxlığı", "Slurry density after"], v:(v.M + w2) / q2, u:"t/m³", d:3}
     ]};
   },
-  formulas: ["Su = M × (100 / C2 − 100 / C1)"]
+  formulas: [["Su = M × (100 / C2 − 100 / C1)", "Water = M × (100 / C2 − 100 / C1)"]]
 },
 {
-  id: "kinetika", name: "Kinetika", title: "Flotasiya kinetikası",
-  intro: "Birinci dərəcəli kinetika ilə bankın gözlənilən bərpasını hesablayır və kameralar üzrə göstərir.",
+  id: "kinetika", name: ["Kinetika", "Kinetics"], title: ["Flotasiya kinetikası", "Flotation kinetics"],
+  intro: ["Birinci dərəcəli kinetika ilə bankın gözlənilən bərpasını hesablayır və kameralar üzrə göstərir.",
+          "Calculates the expected recovery of a bank with first-order kinetics and shows it cell by cell."],
   inputs: [
-    {k:"Rmax", label:"Maksimal bərpa (R∞)", unit:"%", def:95},
-    {k:"k", label:"Sürət sabiti (k)", unit:"1/dəq", def:0.25, hint:"Sənaye kamerası üçün. Laboratoriya k-sı adətən 2–2.5 dəfə böyük olur."},
-    {k:"t", label:"Bankda ümumi qalma vaxtı", unit:"dəq", def:20},
-    {k:"n", label:"Kameraların sayı", unit:"ədəd", def:6}
+    {k:"Rmax", label:["Maksimal bərpa (R∞)", "Maximum recovery (R∞)"], unit:"%", def:95},
+    {k:"k", label:["Sürət sabiti (k)", "Rate constant (k)"], unit:U.permin, def:0.25,
+      hint:["Sənaye kamerası üçün. Laboratoriya k-sı adətən 2–2.5 dəfə böyük olur.", "For a plant cell. The lab k is usually 2–2.5 times higher."]},
+    {k:"t", label:["Bankda ümumi qalma vaxtı", "Total residence time in the bank"], unit:U.min, def:20},
+    {k:"n", label:["Kameraların sayı", "Number of cells"], unit:U.pcs, def:6}
   ],
   calc(v) {
     const n = Math.round(v.n);
-    if (n < 1 || n > 40) return {err:"Kamera sayı 1 ilə 40 arasında olmalıdır."};
-    if (v.k <= 0 || v.t <= 0 || v.Rmax <= 0 || v.Rmax > 100) return {err:"k və vaxt sıfırdan böyük, R∞ isə 0–100 % arasında olmalıdır."};
+    if (n < 1 || n > 40) return {err:["Kamera sayı 1 ilə 40 arasında olmalıdır.", "Number of cells must be between 1 and 40."]};
+    if (v.k <= 0 || v.t <= 0 || v.Rmax <= 0 || v.Rmax > 100) return {err:["k və vaxt sıfırdan böyük, R∞ isə 0–100 % arasında olmalıdır.", "k and time must be greater than zero, and R∞ between 0 and 100 %."]};
     const kt = v.k * v.t / n;
     const series = i => v.Rmax * (1 - Math.pow(1 + kt, -i));
-    const table = {head:["Kamera", "Vaxt, dəq", "Kamera üzrə, %", "Toplam bərpa, %"], body:[]};
+    const table = {head:[["Kamera", "Cell"], ["Vaxt, dəq", "Time, min"], ["Kamera üzrə, %", "Per cell, %"], ["Toplam bərpa, %", "Cumulative recovery, %"]], body:[]};
     for (let i = 1; i <= n; i++) table.body.push([i, fmt(v.t * i / n, 1), fmt(series(i) - series(i - 1), 1), fmt(series(i), 1)]);
     return {rows: [
-      {l:`Bankın bərpası (${n} ardıcıl kamera)`, v:series(n), u:"%", d:1, main:true},
-      {l:"Laboratoriya (batch) rejimində", v:v.Rmax * (1 - Math.exp(-v.k * v.t)), u:"%", d:1},
-      {l:"Tək ideal qarışdırıcı kimi", v:v.Rmax * v.k * v.t / (1 + v.k * v.t), u:"%", d:1}
+      {l:[`Bankın bərpası (${n} ardıcıl kamera)`, `Bank recovery (${n} cells in series)`], v:series(n), u:"%", d:1, main:true},
+      {l:["Laboratoriya (batch) rejimində", "In lab (batch) mode"], v:v.Rmax * (1 - Math.exp(-v.k * v.t)), u:"%", d:1},
+      {l:["Tək ideal qarışdırıcı kimi", "As a single perfect mixer"], v:v.Rmax * v.k * v.t / (1 + v.k * v.t), u:"%", d:1}
     ], table};
   },
-  formulas: ["Ardıcıl kameralar: R = R∞ × (1 − (1 + k × t / n)⁻ⁿ)", "Batch: R = R∞ × (1 − e⁻ᵏᵗ)"]
+  formulas: [["Ardıcıl kameralar: R = R∞ × (1 − (1 + k × t / n)⁻ⁿ)", "Cells in series: R = R∞ × (1 − (1 + k × t / n)⁻ⁿ)"], "Batch: R = R∞ × (1 − e⁻ᵏᵗ)"]
 }
 ];
 
@@ -424,81 +529,104 @@ if (typeof document !== "undefined") {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} };
+  LANG = saved._lang === "en" ? 1 : 0;
+  let current = MODS[0].id;
 
   const nav = document.getElementById("nav"), panels = document.getElementById("panels");
+  const inputId = (m, i) => `${m.id}-${i.k}`;
 
-  MODS.forEach(m => {
-    const b = document.createElement("button");
-    b.type = "button"; b.id = "tab-" + m.id; b.textContent = m.name; b.setAttribute("role", "tab");
-    b.addEventListener("click", () => show(m.id, true));
-    nav.appendChild(b);
+  function build() {
+    document.documentElement.lang = LANG ? "en" : "az";
+    document.getElementById("h1").textContent = tr(UI.h1);
+    document.getElementById("lead").textContent = tr(UI.lead);
+    document.getElementById("foot").textContent = tr(UI.foot);
+    document.getElementById("lang-az").setAttribute("aria-pressed", String(LANG === 0));
+    document.getElementById("lang-en").setAttribute("aria-pressed", String(LANG === 1));
+    nav.setAttribute("aria-label", tr(UI.navLabel));
+    nav.innerHTML = ""; panels.innerHTML = "";
 
-    const sec = document.createElement("section");
-    sec.className = "panel"; sec.id = "panel-" + m.id; sec.hidden = true;
-    sec.setAttribute("role", "tabpanel"); sec.setAttribute("aria-labelledby", "tab-" + m.id);
-    sec.innerHTML = `
-      <div class="panel-head">
-        <div><h2>${m.title}</h2><p>${m.intro}</p></div>
-        <button type="button" class="reset" id="${m.id}-reset">Nümunə dəyərləri qaytar</button>
-      </div>
-      <div class="cols">
-        <div class="box"><h3>Giriş</h3><div class="fields">
-          ${m.inputs.map(i => `<div class="field">
-            <label for="${m.id}-${i.k}">${i.label}</label>
-            <div class="ctl"><input id="${m.id}-${i.k}" type="text" inputmode="decimal" autocomplete="off"><span class="unit">${i.unit}</span></div>
-            ${i.hint ? `<small>${i.hint}</small>` : ""}
-          </div>`).join("")}
-        </div></div>
-        <div class="box"><h3>Nəticə</h3><div id="${m.id}-out" aria-live="polite"></div></div>
-      </div>
-      <div class="box formulas"><h3>Düsturlar</h3><ul>${m.formulas.map(f => `<li>${f}</li>`).join("")}</ul></div>`;
-    panels.appendChild(sec);
+    MODS.forEach(m => {
+      const b = document.createElement("button");
+      b.type = "button"; b.id = "tab-" + m.id; b.textContent = tr(m.name); b.setAttribute("role", "tab");
+      b.addEventListener("click", () => show(m.id, true));
+      nav.appendChild(b);
 
-    if (!saved[m.id] || typeof saved[m.id] !== "object") saved[m.id] = {};
-    m.inputs.forEach(i => {
-      const el = document.getElementById(`${m.id}-${i.k}`);
-      el.value = saved[m.id][i.k] ?? String(i.def);
-      el.addEventListener("input", () => { saved[m.id][i.k] = el.value; persist(); run(m); });
-    });
-    document.getElementById(`${m.id}-reset`).addEventListener("click", () => {
-      m.inputs.forEach(i => { document.getElementById(`${m.id}-${i.k}`).value = String(i.def); });
-      saved[m.id] = {}; persist();
+      const sec = document.createElement("section");
+      sec.className = "panel"; sec.id = "panel-" + m.id; sec.hidden = true;
+      sec.setAttribute("role", "tabpanel"); sec.setAttribute("aria-labelledby", "tab-" + m.id);
+      sec.innerHTML = `
+        <div class="panel-head">
+          <div><h2>${tr(m.title)}</h2><p>${tr(m.intro)}</p></div>
+          <button type="button" class="reset" id="${m.id}-reset">${tr(UI.reset)}</button>
+        </div>
+        <div class="cols">
+          <div class="box"><h3>${tr(UI.input)}</h3><div class="fields">
+            ${m.inputs.map(i => `<div class="field">
+              <label for="${inputId(m, i)}">${tr(i.label)}</label>
+              <div class="ctl"><input id="${inputId(m, i)}" type="text" inputmode="decimal" autocomplete="off"><span class="unit">${tr(i.unit)}</span></div>
+              ${i.hint ? `<small>${tr(i.hint)}</small>` : ""}
+            </div>`).join("")}
+          </div></div>
+          <div class="box"><h3>${tr(UI.result)}</h3><div id="${m.id}-out" aria-live="polite"></div></div>
+        </div>
+        <div class="box formulas"><h3>${tr(UI.formulas)}</h3><ul>${m.formulas.map(f => `<li>${tr(f)}</li>`).join("")}</ul></div>`;
+      panels.appendChild(sec);
+
+      if (!saved[m.id] || typeof saved[m.id] !== "object") saved[m.id] = {};
+      m.inputs.forEach(i => {
+        const el = document.getElementById(inputId(m, i));
+        el.value = saved[m.id][i.k] ?? String(i.def);
+        el.addEventListener("input", () => { saved[m.id][i.k] = el.value; persist(); run(m); });
+      });
+      document.getElementById(`${m.id}-reset`).addEventListener("click", () => {
+        m.inputs.forEach(i => { document.getElementById(inputId(m, i)).value = String(i.def); });
+        saved[m.id] = {}; persist();
+        run(m);
+      });
       run(m);
     });
-    run(m);
-  });
+    show(current, false);
+  }
+
+  function msg(st, text) { return `<div class="msg ${st}"><b>${tr(UI[st])}</b>${text}</div>`; }
 
   function run(m) {
     const out = document.getElementById(`${m.id}-out`), v = {};
     let bad = false;
     m.inputs.forEach(i => {
-      const el = document.getElementById(`${m.id}-${i.k}`);
+      const el = document.getElementById(inputId(m, i));
       v[i.k] = parseNum(el.value);
       const inv = !isFinite(v[i.k]);
       el.classList.toggle("invalid", inv);
       if (inv) bad = true;
     });
-    if (bad) { out.innerHTML = `<div class="msg bad">Bütün xanalara rəqəm yazın.</div>`; return; }
+    if (bad) { out.innerHTML = msg("bad", tr(UI.fill)); return; }
     const r = m.calc(v);
-    if (r.err) { out.innerHTML = `<div class="msg bad">${r.err}</div>`; return; }
+    if (r.err) { out.innerHTML = msg("bad", tr(r.err)); return; }
     let h = `<div class="rows">` + r.rows.map(x =>
-      `<div class="row${x.main ? " main" : ""}"><span class="l">${x.l}</span><span class="v">${fmt(x.v, x.d)}${x.u ? `<span>${x.u}</span>` : ""}</span></div>`
+      `<div class="row${x.main ? " main" : ""}"><span class="l">${tr(x.l)}</span><span class="v">${fmt(x.v, x.d)}${x.u ? `<span>${tr(x.u)}</span>` : ""}</span></div>`
     ).join("") + `</div>`;
-    if (r.table) h += `<div class="tablewrap"><table><thead><tr>${r.table.head.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${
+    if (r.table) h += `<div class="tablewrap"><table><thead><tr>${r.table.head.map(c => `<th>${tr(c)}</th>`).join("")}</tr></thead><tbody>${
       r.table.body.map(row => `<tr>${row.map(c => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
-    if (r.msgs && r.msgs.length) h += `<div class="msgs">${r.msgs.map(x => `<div class="msg ${x.st}">${x.t}</div>`).join("")}</div>`;
+    if (r.msgs && r.msgs.length) h += `<div class="msgs">${r.msgs.map(x => msg(x.st, tr(x.t))).join("")}</div>`;
     out.innerHTML = h;
   }
 
   function show(id, setHash) {
     if (!MODS.some(m => m.id === id)) id = MODS[0].id;
+    current = id;
     MODS.forEach(m => {
       document.getElementById("panel-" + m.id).hidden = m.id !== id;
       document.getElementById("tab-" + m.id).setAttribute("aria-selected", String(m.id === id));
     });
     if (setHash) { try { history.replaceState(null, "", "#" + id); } catch (e) { location.hash = id; } }
   }
+
+  function setLang(n) { LANG = n; saved._lang = n ? "en" : "az"; persist(); build(); }
+  document.getElementById("lang-az").addEventListener("click", () => setLang(0));
+  document.getElementById("lang-en").addEventListener("click", () => setLang(1));
   window.addEventListener("hashchange", () => show(location.hash.slice(1), false));
-  show(location.hash.slice(1), false);
+  current = location.hash.slice(1) || current;
+  build();
 }
 </script>
