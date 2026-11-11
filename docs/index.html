@@ -869,8 +869,8 @@ if (typeof document !== "undefined") {
     return Promise.resolve();
   }
 
-  // Shared online log. Stays off until the Supabase project address and key are filled in.
-  const CLOUD = {url: "", key: ""};
+  // Shared online log. The key below is the public (publishable) one; access is gated by the shared code.
+  const CLOUD = {url: "https://hjdavobmepmdiraidgut.supabase.co", key: "sb_publishable_qDU0NEUVepZ3n3gpWPxVKA_Sp7ghSBe"};
   const cloudOn = () => !!(CLOUD.url && CLOUD.key);
   let cloudState = "idle", onCloudChange = null, drawCloud = null, syncing = null, syncAgain = false;
   async function rpc(fn, body) {
