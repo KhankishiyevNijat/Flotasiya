@@ -1,7 +1,7 @@
 // Offline support: the app shell is cached on install; pages are fetched from the
 // network first so updates arrive, with the cached copy used when offline.
-const CACHE = "flotasiya-v3";
-const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "xlsx.mini.min.js"];
+const CACHE = "flotasiya-v4";
+const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "jspdf.umd.min.js", "jspdf.plugin.autotable.min.js", "report-font.ttf", "report-font-bold.ttf"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -153,19 +153,23 @@ th:first-child, td:first-child { text-align: left; }
   width: 100%; min-width: 0; font: 500 16px var(--font-body); font-variant-numeric: tabular-nums;
   color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
 }
-.rgrid {
-  display: grid; grid-template-columns: minmax(72px, 1.5fr) repeat(3, minmax(0, 1fr)) minmax(52px, 1fr);
-  gap: 6px; align-items: center;
-}
-.rgrid .h { font-size: 12px; color: var(--muted); font-weight: 500; line-height: 1.25; }
-.rgrid .h:last-child, .rgrid .ds { text-align: right; }
-.rgrid .nm { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
-.rgrid input { padding: 7px 6px; font-size: 15px; }
-.rgrid .ds { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--accent); }
 @media (max-width: 520px) {
   .fields.g3.dt { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .fields.g3.dt .field:last-child { grid-column: 1 / -1; }
 }
+.fields.g3.dt2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+select.plain { padding: 8px 6px; }
+.line { border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.line-top { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto; gap: 6px; }
+.line-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(56px, 1fr); gap: 6px; align-items: end; }
+.line-nums label { font-size: 12px; color: var(--muted); font-weight: 500; display: flex; flex-direction: column; gap: 3px; line-height: 1.25; }
+.line-nums .plain { padding: 7px 6px; font-size: 15px; }
+.line-nums .ds { display: flex; flex-direction: column; gap: 3px; text-align: right; font-size: 12px; color: var(--muted); font-weight: 500; line-height: 1.25; }
+.line-nums .ds b { font-size: 16px; color: var(--accent); padding: 7px 0; font-variant-numeric: tabular-nums; }
+.resrow { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.resrow .t { font-weight: 600; }
+.resrow .sp { flex: 1; }
+.sub { font: 600 12px var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
 .hint { color: var(--muted); font-size: 12.5px; margin: 0; }
 .entry { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .entry-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; }
@@ -651,8 +655,8 @@ const MODS = [
 },
 {
   id: "jurnal", name: ["Reagent jurnalı", "Reagent log"], title: ["Reagent dozası və növbə jurnalı", "Reagent dose and shift log"], custom: true,
-  intro: ["Ölçü qabının dolma vaxtından reagentin dozasını (q/t) hesablayır. Hər dəyişikliyi jurnala yazın, analiz nəticələrini sonra əlavə edin və növbənin sonunda hesabatı saxlayın.",
-          "Calculates reagent dose (g/t) from the time it takes to fill a measuring cup. Save each change to the log, add assay results later and save the report at the end of the shift."],
+  intro: ["Ölçü qabının dolma vaxtından hər nöqtəyə verilən reagentin dozasını (q/t) hesablayır. Reagenti dəyişəndə ayarı jurnala yazın, analiz nəticələrini çıxdıqca öz vaxtı ilə əlavə edin və növbənin sonunda PDF hesabatı saxlayın.",
+          "Calculates the reagent dose (g/t) going to each point from the time it takes to fill a measuring cup. Save the setting whenever you change a reagent, add assay results with their own time as they come in, and save the PDF report at the end of the shift."],
   inputs: [],
   formulas: [
     ["Doza (q/t) = (Qab ml / Vaxt san) × (Qatılıq % / 100) × 3600 / Tonnaj (t/saat)", "Dose (g/t) = (Cup mL / Time s) × (Strength % / 100) × 3600 / Tonnage (t/h)"],
@@ -663,43 +667,86 @@ const MODS = [
 ];
 
 const REAGENTS = [["SIPX", 14], ["PAX", 10], ["PBX", 10], ["MIBC", 100], ["Jam collector", 100], ["MX 3754", 100], ["MX 5151", 100]];
+const POINTS = ["Feedbox", "148", "149", "151", "152", "153", "154", "161-162", "173-176", "181-184"];
 function doseGt(ml, s, conc, ton) { return (ml / s) * (conc / 100) * 3600 / ton; }
 const LG = {
-  newEntry: ["Yeni qeyd", "New entry"], date: ["Tarix", "Date"], time: ["Saat", "Time"], ton: ["Tonnaj", "Tonnage"],
-  reagent: ["Reagent", "Reagent"], conc: ["Qatılıq, %", "Strength, %"], ml: ["Qab, ml", "Cup, mL"], sec: ["Vaxt, san", "Time, s"], dose: ["Doza, q/t", "Dose, g/t"],
-  hintRow: ["Ölçmədiyiniz reagentin vaxt xanasını boş saxlayın.", "Leave the time empty for any reagent you did not measure."],
+  setBox: ["Reagent ayarı", "Reagent setting"], resBox: ["Analiz nəticəsi", "Assay result"],
+  date: ["Tarix", "Date"], time: ["Saat", "Time"], ton: ["Tonnaj", "Tonnage"],
+  reagent: ["Reagent", "Reagent"], point: ["Nöqtə", "Point"], conc: ["Qatılıq, %", "Strength, %"], ml: ["Qab, ml", "Cup, mL"], sec: ["Vaxt, san", "Time, s"], dose: ["Doza, q/t", "Dose, g/t"],
+  addLine: ["+ Reagent / nöqtə əlavə et", "+ Add reagent / point"], remove: ["Sətri sil", "Remove line"],
+  hintRow: ["Hər sətir bir reagentin bir nöqtəyə verilməsidir. Eyni reagenti bir neçə nöqtəyə vermək üçün yeni sətir əlavə edin. Vaxtı boş olan sətir jurnala yazılmır.",
+            "Each line is one reagent going to one point. Add another line to send the same reagent to several points. A line with no time is not saved."],
+  total: ["Cəmi", "Total"],
   note: ["Qeyd (istəyə görə)", "Note (optional)"],
-  results: ["Analiz nəticələri (sonra da yaza bilərsiniz)", "Assay results (can be added later)"],
+  saveSet: ["Ayarı jurnala yaz", "Save setting to log"], savedSet: ["Reagent ayarı jurnala yazıldı.", "Reagent setting saved to the log."],
+  resHint: ["Nəticə çıxanda vaxtı ilə birlikdə yazın. Həmin vaxtda qüvvədə olan reagent ayarına özü bağlanır.", "Enter the result with its time when it comes in. It is linked to the reagent setting in use at that time."],
+  saveRes: ["Nəticəni jurnala yaz", "Save result to log"], savedRes: ["Nəticə jurnala yazıldı. Aid olduğu ayar:", "Result saved to the log. Linked setting:"],
+  savedResNone: ["Nəticə jurnala yazıldı. Bu vaxtdan əvvəl reagent ayarı yoxdur.", "Result saved to the log. There is no reagent setting before this time."],
+  needRes: ["Ən azı bir nəticə yazın.", "Enter at least one result."],
   feed: ["Flotasiya feed Cu", "Flotation feed Cu"], tail: ["Rougher tail Cu", "Rougher tail Cu"], fconc: ["Final cleaner conc. Cu", "Final cleaner conc. Cu"],
-  save: ["Jurnala yaz", "Save to log"], saved: ["Qeyd jurnala yazıldı.", "Entry saved to the log."],
+  sFeed: ["Feed", "Feed"], sTail: ["Rg tail", "Rg tail"], sConc: ["Final conc.", "Final conc."],
   needTon: ["Tonnajı yazın (sıfırdan böyük).", "Enter the tonnage (greater than zero)."],
-  needOne: ["Ən azı bir reagent üçün qabın həcmini və dolma vaxtını yazın.", "Enter the cup volume and fill time for at least one reagent."],
-  log: ["Jurnal", "Log"], count: ["qeyd", "entries"],
-  empty: ["Hələ qeyd yoxdur. Yuxarıda reagentləri ölçüb «Jurnala yaz» düyməsinə basın.", "No entries yet. Measure the reagents above and press “Save to log”."],
-  copy: ["Hesabatı kopyala", "Copy report"], xlsx: ["Excel hesabatı yüklə", "Download Excel report"], clear: ["Bütün qeydləri sil", "Delete all entries"],
-  copied: ["Hesabat kopyalandı. Excel-ə və ya mesaja yapışdıra bilərsiniz.", "Report copied. You can paste it into Excel or a message."],
+  needOne: ["Ən azı bir sətirdə qatılığı, qabın həcmini və dolma vaxtını yazın.", "Enter the strength, cup volume and fill time in at least one line."],
+  log: ["Jurnal", "Log"], nSets: ["ayar", "settings"], nRes: ["nəticə", "results"],
+  empty: ["Hələ qeyd yoxdur. Yuxarıda reagent ayarını yazıb jurnala əlavə edin.", "No entries yet. Enter a reagent setting above and save it to the log."],
+  resOf: ["Bu ayarın nəticələri", "Results for this setting"], noRes: ["Bu ayar üçün hələ nəticə yoxdur.", "No results for this setting yet."],
+  orphan: ["İlk ayardan əvvəlki nəticələr", "Results before the first setting"],
+  copy: ["Hesabatı kopyala", "Copy report"], pdf: ["PDF hesabat yüklə", "Download PDF report"], clear: ["Bütün qeydləri sil", "Delete all entries"],
+  copied: ["Hesabat kopyalandı. Mesaja və ya Excel-ə yapışdıra bilərsiniz.", "Report copied. You can paste it into a message or Excel."],
   copyManual: ["Avtomatik kopyalanmadı. Aşağıdakı mətni seçib kopyalayın.", "Automatic copy did not work. Select and copy the text below."],
-  downloaded: ["Hesabat faylı yükləndi.", "Report file downloaded."],
+  pdfDone: ["PDF hesabat hazırlandı.", "PDF report created."],
+  pdfFail: ["PDF yaradıla bilmədi. Bu, yalnız quraşdırılmış tətbiqdə (GitHub Pages ünvanında) işləyir. Burada «Hesabatı kopyala» düyməsindən istifadə edin.",
+            "The PDF could not be created. It only works in the installed app (the GitHub Pages address). Use “Copy report” here."],
   nothing: ["Jurnal boşdur, hesabat üçün qeyd yoxdur.", "The log is empty, there is nothing to report."],
   sure: ["Bütün qeydlər silinsin? Bu geri qaytarılmır.", "Delete all entries? This cannot be undone."],
   yes: ["Bəli, sil", "Yes, delete"], no: ["Xeyr", "No"], del: ["Sil", "Delete"], delSure: ["Silinsin?", "Delete?"],
   cleared: ["Bütün qeydlər silindi.", "All entries deleted."],
-  device: ["Qeydlər yalnız bu cihazda saxlanır. Silməzdən əvvəl hesabatı saxlayın.", "Entries are stored on this device only. Save the report before deleting."],
-  rDate: ["Tarix", "Date"], rTime: ["Saat", "Time"], rTon: ["Tonnaj, t/saat", "Tonnage, t/h"], rNote: ["Qeyd", "Note"],
-  rFeed: ["Flotasiya feed Cu, %", "Flotation feed Cu, %"], rTail: ["Rougher tail Cu, %", "Rougher tail Cu, %"], rConc: ["Final cleaner conc. Cu, %", "Final cleaner conc. Cu, %"],
-  sheet: ["Hesabat", "Report"], file: ["flotasiya-hesabat", "flotation-report"]
+  device: ["Qeydlər yalnız bu cihazda saxlanır. Silməzdən əvvəl hesabatı saxlayın.", "Entries are stored on this device only. Save the report before deleting."]
 };
-// Report as rows of cells: first row is the header, numbers stay numbers.
-function reportRows(log) {
-  const sorted = log.slice().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-  const names = REAGENTS.map(r => r[0]).filter(n => sorted.some(e => e.items.some(i => i.name === n)));
-  const unit = tr(U.gpt);
-  const head = [tr(LG.rDate), tr(LG.rTime), tr(LG.rTon), ...names.map(n => `${n}, ${unit}`), tr(LG.rFeed), tr(LG.rTail), tr(LG.rConc), tr(LG.rNote)];
-  const num = x => { const n = parseNum(x); return isFinite(n) ? n : ""; };
-  const rows = sorted.map(e => [e.date, e.time, e.ton,
-    ...names.map(n => { const i = e.items.find(i => i.name === n); return i ? Math.round(i.dose * 1000) / 1000 : ""; }),
-    num(e.feed), num(e.tail), num(e.fconc), e.note || ""]);
-  return [head, ...rows];
+const stamp = e => `${e.date} ${e.time}`;
+// Older logs kept results inside the reagent entry; split them into separate entries.
+function migrateLog(log) {
+  const out = [];
+  (Array.isArray(log) ? log : []).forEach(e => {
+    if (!e || typeof e !== "object") return;
+    if (e.type === "set" || e.type === "res") { out.push(e); return; }
+    out.push({id: e.id, type: "set", date: e.date, time: e.time, ton: e.ton, note: e.note || "", items: (e.items || []).map(i => ({point: "", ...i}))});
+    if (e.feed || e.tail || e.fconc) out.push({id: e.id + "r", type: "res", date: e.date, time: e.time, feed: e.feed || "", tail: e.tail || "", fconc: e.fconc || ""});
+  });
+  return out;
+}
+// Settings in time order, and each result paired with the setting in use at its time.
+function splitLog(log) {
+  const by = (a, b) => stamp(a).localeCompare(stamp(b));
+  const sets = log.filter(e => e.type === "set").sort(by);
+  const results = log.filter(e => e.type === "res").sort(by).map(r => {
+    let set = null;
+    sets.forEach(s => { if (stamp(s) <= stamp(r)) set = s; });
+    return {r, set};
+  });
+  return {sets, results};
+}
+function totals(items) {
+  const m = new Map();
+  items.forEach(i => m.set(i.name, (m.get(i.name) || 0) + i.dose));
+  return [...m.entries()];
+}
+const plain = (x, d) => isFinite(x) ? Number(x).toFixed(d) : "–";
+const REPORT_TITLE = "Shift report for reagent dosage";
+const SET_HEAD = ["Date / time", "Tonnage, t/h", "Reagent", "Point", "Strength, %", "Cup, mL", "Fill time, s", "Dose, g/t"];
+const RES_HEAD = ["Date / time", "Flotation feed Cu, %", "Rougher tail Cu, %", "Final cleaner conc. Cu, %", "Reagent setting in use"];
+const totalLine = items => "Total: " + totals(items).map(([n, v]) => `${n} ${plain(v, 2)} g/t`).join(" · ");
+function reportText(log) {
+  const {sets, results} = splitLog(log), L = [REPORT_TITLE, "", "REAGENT SETTINGS", SET_HEAD.join("\t")];
+  const clean = s => String(s).replace(/[\t\n]/g, " ");
+  sets.forEach(s => {
+    s.items.forEach(i => L.push([stamp(s), plain(s.ton, 0), i.name, i.point || "–", plain(i.conc, 0), plain(i.ml, 0), plain(i.s, 1), plain(i.dose, 2)].join("\t")));
+    L.push([stamp(s), "", totalLine(s.items)].join("\t"));
+    if (s.note) L.push([stamp(s), "", "Note: " + clean(s.note)].join("\t"));
+  });
+  L.push("", "ASSAY RESULTS", RES_HEAD.join("\t"));
+  results.forEach(({r, set}) => L.push([stamp(r), clean(r.feed || "–"), clean(r.tail || "–"), clean(r.fconc || "–"), set ? stamp(set) : "–"].join("\t")));
+  return L.join("\n");
 }
 
 function fmt(x, d) {
@@ -728,62 +775,126 @@ if (typeof document !== "undefined") {
   const pad = n => String(n).padStart(2, "0");
   const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
   const nowTime = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-  let xlsxLoading = null;
-  function loadXlsx() {
-    if (window.XLSX) return Promise.resolve();
-    // The installed app ships its own copy; the CDN is the fallback elsewhere.
-    const srcs = ["xlsx.mini.min.js", "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.mini.min.js"];
-    const tryLoad = i => new Promise((res, rej) => {
-      const s = document.createElement("script");
-      s.src = srcs[i];
-      s.onload = () => window.XLSX ? res() : rej(new Error("xlsx"));
-      s.onerror = () => { s.remove(); i + 1 < srcs.length ? tryLoad(i + 1).then(res, rej) : rej(new Error("xlsx")); };
-      document.head.appendChild(s);
+
+  // PDF library and report font ship with the installed app.
+  let pdfLoading = null;
+  const addScript = src => new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = src;
+    s.onload = () => res(); s.onerror = () => { s.remove(); rej(new Error(src)); };
+    document.head.appendChild(s);
+  });
+  const toB64 = buf => { const u = new Uint8Array(buf); let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+  function loadPdf() {
+    if (!pdfLoading) pdfLoading = addScript("jspdf.umd.min.js")
+      .then(() => addScript("jspdf.plugin.autotable.min.js"))
+      .then(() => Promise.all(["report-font.ttf", "report-font-bold.ttf"].map(f => fetch(f).then(r => { if (!r.ok) throw new Error(f); return r.arrayBuffer(); }).then(toB64))))
+      .catch(e => { pdfLoading = null; throw e; });
+    return pdfLoading;
+  }
+  function makePdf(log, fonts) {
+    const doc = new window.jspdf.jsPDF({unit: "mm", format: "a4"});
+    doc.addFileToVFS("rep.ttf", fonts[0]); doc.addFont("rep.ttf", "rep", "normal");
+    doc.addFileToVFS("repb.ttf", fonts[1]); doc.addFont("repb.ttf", "rep", "bold");
+    const {sets, results} = splitLog(log);
+    const all = [...sets, ...results.map(x => x.r)].map(stamp).sort();
+    const green = [15, 110, 92], soft = [233, 238, 236];
+    doc.setFont("rep", "bold"); doc.setFontSize(16); doc.text(REPORT_TITLE, 14, 18);
+    doc.setFont("rep", "normal"); doc.setFontSize(9); doc.setTextColor(90);
+    doc.text(`Period: ${all[0]} – ${all[all.length - 1]}      Generated: ${today()} ${nowTime()}`, 14, 24);
+    doc.setTextColor(0);
+    const style = {font: "rep", fontSize: 8.5, cellPadding: 1.6, lineColor: [200, 208, 205], lineWidth: 0.1, textColor: 20};
+    const head = {fillColor: green, textColor: 255, fontStyle: "bold"};
+    const title = (t, y) => { doc.setFont("rep", "bold"); doc.setFontSize(11); doc.text(t, 14, y); };
+
+    title("Reagent settings", 33);
+    const body = [];
+    sets.forEach(s => {
+      const span = s.items.length + 1 + (s.note ? 1 : 0);
+      s.items.forEach((i, k) => {
+        const row = [i.name, i.point || "–", plain(i.conc, 0), plain(i.ml, 0), plain(i.s, 1), plain(i.dose, 2)];
+        body.push(k ? row : [{content: stamp(s), rowSpan: span}, {content: plain(s.ton, 0), rowSpan: span}, ...row]);
+      });
+      body.push([{content: totalLine(s.items), colSpan: 6, styles: {fontStyle: "bold", fillColor: soft}}]);
+      if (s.note) body.push([{content: "Note: " + s.note, colSpan: 6}]);
     });
-    if (!xlsxLoading) xlsxLoading = tryLoad(0).catch(e => { xlsxLoading = null; throw e; });
-    return xlsxLoading;
+    if (!sets.length) body.push([{content: "No reagent settings recorded.", colSpan: 8}]);
+    doc.autoTable({startY: 36, head: [SET_HEAD], body, theme: "grid", styles: style, headStyles: head, margin: {left: 14, right: 14},
+      columnStyles: {0: {cellWidth: 30}, 1: {cellWidth: 20, halign: "right"}, 4: {halign: "right"}, 5: {halign: "right"}, 6: {halign: "right"}, 7: {halign: "right", fontStyle: "bold"}}});
+
+    let y = doc.lastAutoTable.finalY + 11;
+    if (y > 265) { doc.addPage(); y = 20; }
+    title("Assay results", y);
+    const rbody = results.map(({r, set}) => [stamp(r), r.feed || "–", r.tail || "–", r.fconc || "–", set ? stamp(set) : "–"]);
+    if (!results.length) rbody.push([{content: "No assay results recorded.", colSpan: 5}]);
+    doc.autoTable({startY: y + 3, head: [RES_HEAD], body: rbody, theme: "grid", styles: style, headStyles: head, margin: {left: 14, right: 14},
+      columnStyles: {0: {cellWidth: 30}, 1: {halign: "right"}, 2: {halign: "right"}, 3: {halign: "right"}}});
+
+    const n = doc.getNumberOfPages();
+    doc.setFont("rep", "normal"); doc.setFontSize(8); doc.setTextColor(120);
+    for (let i = 1; i <= n; i++) { doc.setPage(i); doc.text(`Page ${i} / ${n}`, 196, 290, {align: "right"}); }
+    return doc.output("blob");
+  }
+  function deliver(blob, fname) {
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    try {
+      const file = new File([blob], fname, {type: blob.type});
+      if (ios && navigator.canShare && navigator.canShare({files: [file]})) return navigator.share({files: [file]}).catch(() => {});
+    } catch (e) {}
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    return Promise.resolve();
   }
 
   function renderLog(root) {
-    if (!Array.isArray(saved._log)) saved._log = [];
-    if (!saved._draft || typeof saved._draft !== "object") saved._draft = {ton: "625", note: "", feed: "", tail: "", fconc: "", r: {0: {s: "30"}}};
-    const D = saved._draft; if (!D.r) D.r = {};
-    const rv = (i, k) => { const r = D.r[i] || {}; return r[k] ?? (k === "c" ? String(REAGENTS[i][1]) : k === "ml" ? "100" : ""); };
-    const resultFields = (prefix, vals) => [["feed", LG.feed], ["tail", LG.tail], ["fconc", LG.fconc]].map(([k, l]) => `<div class="field">
-        <label for="${prefix}-${k}">${tr(l)}</label>
-        <div class="ctl"><input id="${prefix}-${k}" data-k="${k}" type="text" inputmode="decimal" autocomplete="off" value="${esc(vals[k] ?? "")}"><span class="unit">%</span></div>
+    saved._log = migrateLog(saved._log);
+    if (!saved._draft || typeof saved._draft !== "object") saved._draft = {ton: "625"};
+    const D = saved._draft;
+    if (!Array.isArray(D.lines)) {
+      D.lines = [];
+      if (D.r) Object.keys(D.r).forEach(i => { const r = D.r[i], R = REAGENTS[i]; if (R && r && r.s) D.lines.push({n: R[0], p: POINTS[0], c: r.c ?? String(R[1]), ml: r.ml ?? "100", s: r.s}); });
+      if (!D.lines.length) D.lines.push({n: "SIPX", p: POINTS[0], c: "14", ml: "100", s: "30"});
+      delete D.r;
+    }
+    const opts = (list, sel) => list.map(v => `<option${v === sel ? " selected" : ""}>${esc(v)}</option>`).join("");
+    const names = REAGENTS.map(r => r[0]);
+    const num = (id, label, val, f) => `<label>${label}<input class="plain" id="${id}" data-f="${f}" type="text" inputmode="decimal" autocomplete="off" value="${esc(val ?? "")}"></label>`;
+    const resFields = () => [["feed", LG.feed], ["tail", LG.tail], ["fconc", LG.fconc]].map(([k, l]) => `<div class="field">
+        <label for="jr-${k}">${tr(l)}</label>
+        <div class="ctl"><input id="jr-${k}" type="text" inputmode="decimal" autocomplete="off" value="${esc((D.res || {})[k] ?? "")}"><span class="unit">%</span></div>
       </div>`).join("");
 
     root.innerHTML = `
-      <div class="box stack">
-        <h3 style="margin:0">${tr(LG.newEntry)}</h3>
+      <div class="box stack" id="jr-setbox">
+        <h3 style="margin:0">${tr(LG.setBox)}</h3>
         <div class="fields g3 dt">
           <div class="field"><label for="jr-date">${tr(LG.date)}</label><input class="plain" id="jr-date" type="date" value="${today()}"></div>
           <div class="field"><label for="jr-time">${tr(LG.time)}</label><input class="plain" id="jr-time" type="time" value="${nowTime()}"></div>
           <div class="field"><label for="jr-ton">${tr(LG.ton)}, ${tr(U.tph)}</label><input class="plain" id="jr-ton" type="text" inputmode="decimal" autocomplete="off" value="${esc(D.ton ?? "")}"></div>
         </div>
-        <div class="rgrid">
-          <div class="h">${tr(LG.reagent)}</div><div class="h">${tr(LG.conc)}</div><div class="h">${tr(LG.ml)}</div><div class="h">${tr(LG.sec)}</div><div class="h">${tr(LG.dose)}</div>
-          ${REAGENTS.map((r, i) => `<div class="nm">${r[0]}</div>
-            <input class="plain" id="jr-c-${i}" aria-label="${r[0]} ${tr(LG.conc)}" type="text" inputmode="decimal" autocomplete="off" value="${esc(rv(i, "c"))}">
-            <input class="plain" id="jr-ml-${i}" aria-label="${r[0]} ${tr(LG.ml)}" type="text" inputmode="decimal" autocomplete="off" value="${esc(rv(i, "ml"))}">
-            <input class="plain" id="jr-s-${i}" aria-label="${r[0]} ${tr(LG.sec)}" type="text" inputmode="decimal" autocomplete="off" value="${esc(rv(i, "s"))}">
-            <div class="ds" id="jr-d-${i}">–</div>`).join("")}
-        </div>
+        <div class="stack" id="jr-lines" style="gap:8px"></div>
+        <div class="btnrow"><button type="button" class="btn" id="jr-add">${tr(LG.addLine)}</button></div>
+        <div class="chips" id="jr-tot"></div>
         <p class="hint">${tr(LG.hintRow)}</p>
         <div class="field"><label for="jr-note">${tr(LG.note)}</label><input class="plain" id="jr-note" type="text" autocomplete="off" value="${esc(D.note ?? "")}"></div>
-        <div>
-          <div class="field"><label>${tr(LG.results)}</label></div>
-          <div class="fields g3">${resultFields("jr", D)}</div>
-        </div>
-        <div class="btnrow"><button type="button" class="btn primary" id="jr-save">${tr(LG.save)}</button></div>
+        <div class="btnrow"><button type="button" class="btn primary" id="jr-save">${tr(LG.saveSet)}</button></div>
         <div id="jr-msg" aria-live="polite"></div>
       </div>
+      <div class="box stack" id="jr-resbox">
+        <h3 style="margin:0">${tr(LG.resBox)}</h3>
+        <p class="hint">${tr(LG.resHint)}</p>
+        <div class="fields g3 dt2">
+          <div class="field"><label for="jr-rdate">${tr(LG.date)}</label><input class="plain" id="jr-rdate" type="date" value="${today()}"></div>
+          <div class="field"><label for="jr-rtime">${tr(LG.time)}</label><input class="plain" id="jr-rtime" type="time" value="${nowTime()}"></div>
+        </div>
+        <div class="fields g3">${resFields()}</div>
+        <div class="btnrow"><button type="button" class="btn primary" id="jr-rsave">${tr(LG.saveRes)}</button></div>
+        <div id="jr-rmsg" aria-live="polite"></div>
+      </div>
       <div class="box stack">
-        <div class="entry-head"><h3 style="margin:0">${tr(LG.log)} · <span id="jr-count"></span></h3></div>
-        <div class="btnrow" id="jr-actions">
+        <h3 style="margin:0">${tr(LG.log)} · <span id="jr-count"></span></h3>
+        <div class="btnrow">
+          <button type="button" class="btn" id="jr-pdf">${tr(LG.pdf)}</button>
           <button type="button" class="btn" id="jr-copy">${tr(LG.copy)}</button>
-          <button type="button" class="btn" id="jr-xlsx">${tr(LG.xlsx)}</button>
           <button type="button" class="btn danger" id="jr-clear">${tr(LG.clear)}</button>
         </div>
         <div id="jr-logmsg" aria-live="polite"></div>
@@ -792,66 +903,109 @@ if (typeof document !== "undefined") {
       </div>`;
 
     const $ = id => document.getElementById(id);
-    const say = (el, st, text) => { $(el).innerHTML = text ? `<div class="msg ${st}">${text}</div>` : ""; };
+    const say = (el, st, text) => { $(el).innerHTML = text ? `<div class="msg ${st}">${st === "warn" || !UI[st] ? "" : `<b>${tr(UI[st])}</b>`}${text}</div>` : ""; };
 
+    function drawLines() {
+      $("jr-lines").innerHTML = D.lines.map((l, i) => `<div class="line" data-i="${i}">
+        <div class="line-top">
+          <select class="plain" id="jr-n-${i}" data-f="n" aria-label="${tr(LG.reagent)}">${opts(names, l.n)}</select>
+          <select class="plain" id="jr-p-${i}" data-f="p" aria-label="${tr(LG.point)}">${opts(POINTS, l.p)}</select>
+          <button type="button" class="btn small danger" data-rm="${i}" aria-label="${tr(LG.remove)}">×</button>
+        </div>
+        <div class="line-nums">
+          ${num(`jr-c-${i}`, tr(LG.conc), l.c, "c")}${num(`jr-ml-${i}`, tr(LG.ml), l.ml, "ml")}${num(`jr-s-${i}`, tr(LG.sec), l.s, "s")}
+          <div class="ds">${tr(LG.dose)}<b id="jr-d-${i}">–</b></div>
+        </div>
+      </div>`).join("");
+      measure();
+    }
     function measure() {
       const ton = parseNum($("jr-ton").value), items = [];
-      REAGENTS.forEach((r, i) => {
-        const c = parseNum($(`jr-c-${i}`).value), ml = parseNum($(`jr-ml-${i}`).value), s = parseNum($(`jr-s-${i}`).value);
+      D.lines.forEach((l, i) => {
+        const c = parseNum(l.c), ml = parseNum(l.ml), s = parseNum(l.s);
         const ok = c > 0 && ml > 0 && s > 0 && ton > 0;
         const dose = ok ? doseGt(ml, s, c, ton) : NaN;
-        $(`jr-d-${i}`).textContent = ok ? fmt(dose, 2) : "–";
-        if (ok) items.push({name: r[0], conc: c, ml, s, dose});
+        const cell = $(`jr-d-${i}`); if (cell) cell.textContent = ok ? fmt(dose, 2) : "–";
+        if (ok) items.push({name: l.n, point: l.p, conc: c, ml, s, dose});
       });
+      $("jr-tot").innerHTML = totals(items).map(([n, v]) => `<span class="chip">${tr(LG.total)} <b>${esc(n)}</b> ${fmt(v, 2)} ${tr(U.gpt)}</span>`).join("");
       return {ton, items};
     }
     function keep() {
       D.ton = $("jr-ton").value; D.note = $("jr-note").value;
-      ["feed", "tail", "fconc"].forEach(k => { D[k] = $("jr-" + k).value; });
-      REAGENTS.forEach((r, i) => { D.r[i] = {c: $(`jr-c-${i}`).value, ml: $(`jr-ml-${i}`).value, s: $(`jr-s-${i}`).value}; });
+      D.res = {feed: $("jr-feed").value, tail: $("jr-tail").value, fconc: $("jr-fconc").value};
       persist();
     }
-    root.querySelector(".box").addEventListener("input", () => { keep(); measure(); });
-    measure();
+    const onLine = ev => {
+      const line = ev.target.closest(".line"), f = ev.target.dataset.f;
+      if (!line || !f) return;
+      const l = D.lines[+line.dataset.i]; l[f] = ev.target.value;
+      if (f === "n") { l.c = String(REAGENTS.find(r => r[0] === l.n)[1]); $(`jr-c-${line.dataset.i}`).value = l.c; }
+      persist(); measure();
+    };
+    $("jr-lines").addEventListener("input", onLine);
+    $("jr-lines").addEventListener("change", onLine);
+    $("jr-lines").addEventListener("click", ev => {
+      const b = ev.target.closest("[data-rm]"); if (!b) return;
+      D.lines.splice(+b.dataset.rm, 1); persist(); drawLines();
+    });
+    $("jr-add").addEventListener("click", () => {
+      const last = D.lines[D.lines.length - 1], n = last ? last.n : "SIPX";
+      const used = D.lines.filter(l => l.n === n).map(l => l.p);
+      D.lines.push({n, p: POINTS.find(p => !used.includes(p)) || POINTS[0], c: last ? last.c : "14", ml: last ? last.ml : "100", s: ""});
+      persist(); drawLines();
+      $(`jr-s-${D.lines.length - 1}`).focus();
+    });
+    ["jr-ton", "jr-note", "jr-feed", "jr-tail", "jr-fconc"].forEach(id => $(id).addEventListener("input", () => { keep(); measure(); }));
+    drawLines();
 
+    const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     $("jr-save").addEventListener("click", () => {
       const m = measure();
-      if (!(m.ton > 0)) return say("jr-msg", "bad", `<b>${tr(UI.bad)}</b>${tr(LG.needTon)}`);
-      if (!m.items.length) return say("jr-msg", "bad", `<b>${tr(UI.bad)}</b>${tr(LG.needOne)}`);
-      saved._log.push({
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        date: $("jr-date").value || today(), time: $("jr-time").value || nowTime(),
-        ton: m.ton, items: m.items, note: $("jr-note").value.trim(),
-        feed: $("jr-feed").value.trim(), tail: $("jr-tail").value.trim(), fconc: $("jr-fconc").value.trim()
-      });
-      ["feed", "tail", "fconc", "note"].forEach(k => { $("jr-" + k).value = ""; });
-      $("jr-time").value = nowTime();
-      keep();
-      say("jr-msg", "good", `<b>${tr(UI.good)}</b>${tr(LG.saved)}`);
-      list();
+      if (!(m.ton > 0)) return say("jr-msg", "bad", tr(LG.needTon));
+      if (!m.items.length) return say("jr-msg", "bad", tr(LG.needOne));
+      saved._log.push({id: newId(), type: "set", date: $("jr-date").value || today(), time: $("jr-time").value || nowTime(), ton: m.ton, items: m.items, note: $("jr-note").value.trim()});
+      $("jr-note").value = ""; $("jr-time").value = nowTime();
+      keep(); say("jr-msg", "good", tr(LG.savedSet)); list();
+    });
+    $("jr-rsave").addEventListener("click", () => {
+      const v = {feed: $("jr-feed").value.trim(), tail: $("jr-tail").value.trim(), fconc: $("jr-fconc").value.trim()};
+      if (!v.feed && !v.tail && !v.fconc) return say("jr-rmsg", "bad", tr(LG.needRes));
+      const e = {id: newId(), type: "res", date: $("jr-rdate").value || today(), time: $("jr-rtime").value || nowTime(), ...v};
+      saved._log.push(e);
+      ["feed", "tail", "fconc"].forEach(k => { $("jr-" + k).value = ""; });
+      $("jr-rtime").value = nowTime();
+      keep(); list();
+      const link = splitLog(saved._log).results.find(x => x.r.id === e.id).set;
+      say("jr-rmsg", "good", link ? `${tr(LG.savedRes)} ${esc(stamp(link))}.` : tr(LG.savedResNone));
     });
 
+    const delBtn = id => `<button type="button" class="btn small danger" data-del="${esc(id)}">${tr(LG.del)}</button>`;
+    const resRow = (r, base) => `<div class="resrow">
+        <span class="t">${esc(r.date === base ? r.time : stamp(r))}</span>
+        <span>${tr(LG.sFeed)} <b>${esc(r.feed || "–")}</b> %</span><span>${tr(LG.sTail)} <b>${esc(r.tail || "–")}</b> %</span><span>${tr(LG.sConc)} <b>${esc(r.fconc || "–")}</b> %</span>
+        <span class="sp"></span>${delBtn(r.id)}
+      </div>`;
     function list() {
-      const log = saved._log.slice().sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
-      $("jr-count").textContent = `${log.length} ${tr(LG.count)}`;
+      const {sets, results} = splitLog(saved._log);
+      $("jr-count").textContent = `${sets.length} ${tr(LG.nSets)} · ${results.length} ${tr(LG.nRes)}`;
       const box = $("jr-list");
-      if (!log.length) { box.innerHTML = `<p class="note">${tr(LG.empty)}</p>`; return; }
-      box.innerHTML = log.map(e => `<div class="entry" data-id="${esc(e.id)}">
-        <div class="entry-head">
-          <span class="when">${esc(e.date)} · ${esc(e.time)}</span>
-          <span class="ton">${fmt(e.ton, 0)} ${tr(U.tph)}</span>
-          <button type="button" class="btn small danger" data-del="${esc(e.id)}">${tr(LG.del)}</button>
-        </div>
-        <div class="chips">${e.items.map(i => `<span class="chip"><b>${esc(i.name)}</b> ${fmt(i.dose, 2)} ${tr(U.gpt)}<small>${fmt(i.ml, 0)} ml / ${fmt(i.s, 1)} s · ${fmt(i.conc, 0)} %</small></span>`).join("")}</div>
-        <div class="fields g3">${resultFields("jr-e-" + e.id, e)}</div>
-        ${e.note ? `<p class="note">${esc(e.note)}</p>` : ""}
-      </div>`).join("");
+      if (!sets.length && !results.length) { box.innerHTML = `<p class="note">${tr(LG.empty)}</p>`; return; }
+      const orphans = results.filter(x => !x.set);
+      let h = sets.slice().reverse().map(s => {
+        const mine = results.filter(x => x.set === s), tot = totals(s.items);
+        return `<div class="entry">
+          <div class="entry-head"><span class="when">${esc(s.date)} · ${esc(s.time)}</span><span class="ton">${fmt(s.ton, 0)} ${tr(U.tph)}</span>${delBtn(s.id)}</div>
+          <div class="chips">${s.items.map(i => `<span class="chip"><b>${esc(i.name)}</b>${i.point ? " → " + esc(i.point) : ""} · ${fmt(i.dose, 2)} ${tr(U.gpt)}<small>${fmt(i.ml, 0)} ml / ${fmt(i.s, 1)} s · ${fmt(i.conc, 0)} %</small></span>`).join("")}</div>
+          <p class="note">${tr(LG.total)}: ${tot.map(([n, v]) => `${esc(n)} ${fmt(v, 2)} ${tr(U.gpt)}`).join(" · ")}</p>
+          ${s.note ? `<p class="note">${esc(s.note)}</p>` : ""}
+          <p class="sub">${tr(LG.resOf)}</p>
+          ${mine.length ? mine.map(x => resRow(x.r, s.date)).join("") : `<p class="note">${tr(LG.noRes)}</p>`}
+        </div>`;
+      }).join("");
+      if (orphans.length) h += `<div class="entry"><p class="sub">${tr(LG.orphan)}</p>${orphans.map(x => resRow(x.r, "")).join("")}</div>`;
+      box.innerHTML = h;
     }
-    $("jr-list").addEventListener("input", ev => {
-      const card = ev.target.closest(".entry"), k = ev.target.dataset.k;
-      const e = card && saved._log.find(x => x.id === card.dataset.id);
-      if (e && k) { e[k] = ev.target.value.trim(); persist(); }
-    });
     $("jr-list").addEventListener("click", ev => {
       const b = ev.target.closest("[data-del]"); if (!b) return;
       if (b.dataset.armed) { saved._log = saved._log.filter(x => x.id !== b.dataset.del); persist(); list(); }
@@ -861,33 +1015,18 @@ if (typeof document !== "undefined") {
 
     $("jr-copy").addEventListener("click", () => {
       if (!saved._log.length) return say("jr-logmsg", "warn", tr(LG.nothing));
-      const text = reportRows(saved._log).map(r => r.map(c => String(c).replace(/[\t\n]/g, " ")).join("\t")).join("\n");
+      const text = reportText(saved._log);
       const manual = () => {
         $("jr-logmsg").innerHTML = `<div class="msg warn">${tr(LG.copyManual)}</div><textarea class="rep" id="jr-rep" readonly></textarea>`;
         $("jr-rep").value = text; $("jr-rep").select();
       };
       try { navigator.clipboard.writeText(text).then(() => say("jr-logmsg", "good", tr(LG.copied)), manual); } catch (e) { manual(); }
     });
-
-    $("jr-xlsx").addEventListener("click", () => {
+    $("jr-pdf").addEventListener("click", () => {
       if (!saved._log.length) return say("jr-logmsg", "warn", tr(LG.nothing));
-      const rows = reportRows(saved._log), name = `${tr(LG.file)}-${today()}`;
-      const viaLink = (blob, fname) => {
-        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = fname;
-        document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-      };
-      loadXlsx().then(() => {
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        ws["!cols"] = rows[0].map((h, i) => ({wch: Math.max(10, String(h).length + 2, i === rows[0].length - 1 ? 30 : 0)}));
-        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, tr(LG.sheet));
-        const out = XLSX.write(wb, {bookType: "xlsx", type: "array"});
-        viaLink(new Blob([out], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}), name + ".xlsx");
-      }).catch(() => {
-        const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
-        viaLink(new Blob(["﻿" + csv], {type: "text/csv;charset=utf-8"}), name + ".csv");
-      }).then(() => say("jr-logmsg", "good", tr(LG.downloaded)));
+      loadPdf().then(fonts => deliver(makePdf(saved._log, fonts), `shift-report-${today()}.pdf`))
+        .then(() => say("jr-logmsg", "good", tr(LG.pdfDone)), () => say("jr-logmsg", "bad", tr(LG.pdfFail)));
     });
-
     $("jr-clear").addEventListener("click", () => {
       if (!saved._log.length) return say("jr-logmsg", "warn", tr(LG.nothing));
       $("jr-logmsg").innerHTML = `<div class="msg bad">${tr(LG.sure)}
@@ -986,7 +1125,7 @@ if (typeof document !== "undefined") {
   function show(id, setHash) {
     if (!MODS.some(m => m.id === id)) id = MODS[0].id;
     current = id; saved._tab = id; persist();
-    if (id === "jurnal") loadXlsx().catch(() => {});
+    if (id === "jurnal") loadPdf().catch(() => {});
     MODS.forEach(m => {
       document.getElementById("panel-" + m.id).hidden = m.id !== id;
       document.getElementById("tab-" + m.id).setAttribute("aria-selected", String(m.id === id));
