@@ -670,7 +670,7 @@ const REAGENTS = [["SIPX", 14], ["PAX", 10], ["PBX", 10], ["MIBC", 100], ["Jam c
 const POINTS = ["Feedbox", "148", "149", "151", "152", "153", "154", "161-162", "173-176", "181-184"];
 function doseGt(ml, s, conc, ton) { return (ml / s) * (conc / 100) * 3600 / ton; }
 const LG = {
-  setBox: ["Reagent ayarı", "Reagent setting"], resBox: ["Analiz nəticəsi", "Assay result"],
+  setBox: ["Reagent ayarı", "Reagent setting"], resBox: ["Saatlıq nəticə", "Hourly result"],
   date: ["Tarix", "Date"], time: ["Saat", "Time"], ton: ["Tonnaj", "Tonnage"],
   reagent: ["Reagent", "Reagent"], point: ["Nöqtə", "Point"], conc: ["Qatılıq, %", "Strength, %"], ml: ["Qab, ml", "Cup, mL"], sec: ["Vaxt, san", "Time, s"], dose: ["Doza, q/t", "Dose, g/t"],
   addLine: ["+ Reagent / nöqtə əlavə et", "+ Add reagent / point"], remove: ["Sətri sil", "Remove line"],
@@ -679,10 +679,13 @@ const LG = {
   total: ["Cəmi", "Total"],
   note: ["Qeyd (istəyə görə)", "Note (optional)"],
   saveSet: ["Ayarı jurnala yaz", "Save setting to log"], savedSet: ["Reagent ayarı jurnala yazıldı.", "Reagent setting saved to the log."],
-  resHint: ["Nəticə çıxanda vaxtı ilə birlikdə yazın. Həmin vaxtda qüvvədə olan reagent ayarına özü bağlanır.", "Enter the result with its time when it comes in. It is linked to the reagent setting in use at that time."],
+  resHint: ["Nəticə çıxanda vaxtı ilə birlikdə yazın. Bütün xanalar istəyə görədir, bildiyinizi doldurun. Qeyd həmin vaxtda qüvvədə olan reagent ayarına özü bağlanır.", "Enter the result with its time when it comes in. Every field is optional, fill in what you have. The entry is linked to the reagent setting in use at that time."],
+  ph: ["pH", "pH"], sol: ["Feed bərk faza (çəki)", "Feed solids by weight"], sPh: ["pH", "pH"], sSol: ["Bərk faza", "Solids"],
+  badPh: ["pH 0 ilə 14 arasında olmalıdır.", "pH must be between 0 and 14."],
+  badSol: ["Feed bərk faza faizi 0 ilə 40 arasında olmalıdır.", "Feed percent solids must be between 0 and 40."],
   saveRes: ["Nəticəni jurnala yaz", "Save result to log"], savedRes: ["Nəticə jurnala yazıldı. Aid olduğu ayar:", "Result saved to the log. Linked setting:"],
   savedResNone: ["Nəticə jurnala yazıldı. Bu vaxtdan əvvəl reagent ayarı yoxdur.", "Result saved to the log. There is no reagent setting before this time."],
-  needRes: ["Ən azı bir nəticə yazın.", "Enter at least one result."],
+  needRes: ["Ən azı bir xananı doldurun.", "Fill in at least one field."],
   feed: ["Flotasiya feed Cu", "Flotation feed Cu"], tail: ["Rougher tail Cu", "Rougher tail Cu"], fconc: ["Final cleaner conc. Cu", "Final cleaner conc. Cu"],
   sFeed: ["Feed", "Feed"], sTail: ["Rg tail", "Rg tail"], sConc: ["Final conc.", "Final conc."],
   needTon: ["Tonnajı yazın (sıfırdan böyük).", "Enter the tonnage (greater than zero)."],
@@ -734,7 +737,8 @@ function totals(items) {
 const plain = (x, d) => isFinite(x) ? Number(x).toFixed(d) : "–";
 const REPORT_TITLE = "Shift report for reagent dosage";
 const SET_HEAD = ["Date / time", "Tonnage, t/h", "Reagent", "Point", "Strength, %", "Cup, mL", "Fill time, s", "Dose, g/t"];
-const RES_HEAD = ["Date / time", "Flotation feed Cu, %", "Rougher tail Cu, %", "Final cleaner conc. Cu, %", "Reagent setting in use"];
+const RES_HEAD = ["Date / time", "Flotation feed Cu, %", "Rougher tail Cu, %", "Final cleaner conc. Cu, %", "pH", "Feed solids, wt %", "Reagent setting in use"];
+const RES_KEYS = ["feed", "tail", "fconc", "ph", "sol"];
 const totalLine = items => "Total: " + totals(items).map(([n, v]) => `${n} ${plain(v, 2)} g/t`).join(" · ");
 function reportText(log) {
   const {sets, results} = splitLog(log), L = [REPORT_TITLE, "", "REAGENT SETTINGS", SET_HEAD.join("\t")];
@@ -744,8 +748,8 @@ function reportText(log) {
     L.push([stamp(s), "", totalLine(s.items)].join("\t"));
     if (s.note) L.push([stamp(s), "", "Note: " + clean(s.note)].join("\t"));
   });
-  L.push("", "ASSAY RESULTS", RES_HEAD.join("\t"));
-  results.forEach(({r, set}) => L.push([stamp(r), clean(r.feed || "–"), clean(r.tail || "–"), clean(r.fconc || "–"), set ? stamp(set) : "–"].join("\t")));
+  L.push("", "HOURLY RESULTS", RES_HEAD.join("\t"));
+  results.forEach(({r, set}) => L.push([stamp(r), ...RES_KEYS.map(k => clean(r[k] || "–")), set ? stamp(set) : "–"].join("\t")));
   return L.join("\n");
 }
 
@@ -823,11 +827,11 @@ if (typeof document !== "undefined") {
 
     let y = doc.lastAutoTable.finalY + 11;
     if (y > 265) { doc.addPage(); y = 20; }
-    title("Assay results", y);
-    const rbody = results.map(({r, set}) => [stamp(r), r.feed || "–", r.tail || "–", r.fconc || "–", set ? stamp(set) : "–"]);
-    if (!results.length) rbody.push([{content: "No assay results recorded.", colSpan: 5}]);
+    title("Hourly results", y);
+    const rbody = results.map(({r, set}) => [stamp(r), ...RES_KEYS.map(k => r[k] || "–"), set ? stamp(set) : "–"]);
+    if (!results.length) rbody.push([{content: "No hourly results recorded.", colSpan: 7}]);
     doc.autoTable({startY: y + 3, head: [RES_HEAD], body: rbody, theme: "grid", styles: style, headStyles: head, margin: {left: 14, right: 14},
-      columnStyles: {0: {cellWidth: 30}, 1: {halign: "right"}, 2: {halign: "right"}, 3: {halign: "right"}}});
+      columnStyles: {0: {cellWidth: 30}, 1: {halign: "right"}, 2: {halign: "right"}, 3: {halign: "right"}, 4: {halign: "right"}, 5: {halign: "right"}, 6: {cellWidth: 30}}});
 
     const n = doc.getNumberOfPages();
     doc.setFont("rep", "normal"); doc.setFontSize(8); doc.setTextColor(120);
@@ -858,9 +862,9 @@ if (typeof document !== "undefined") {
     const opts = (list, sel) => list.map(v => `<option${v === sel ? " selected" : ""}>${esc(v)}</option>`).join("");
     const names = REAGENTS.map(r => r[0]);
     const num = (id, label, val, f) => `<label>${label}<input class="plain" id="${id}" data-f="${f}" type="text" inputmode="decimal" autocomplete="off" value="${esc(val ?? "")}"></label>`;
-    const resFields = () => [["feed", LG.feed], ["tail", LG.tail], ["fconc", LG.fconc]].map(([k, l]) => `<div class="field">
+    const resFields = () => [["feed", LG.feed, "%"], ["tail", LG.tail, "%"], ["fconc", LG.fconc, "%"], ["ph", LG.ph, "pH"], ["sol", LG.sol, "%"]].map(([k, l, u]) => `<div class="field">
         <label for="jr-${k}">${tr(l)}</label>
-        <div class="ctl"><input id="jr-${k}" type="text" inputmode="decimal" autocomplete="off" value="${esc((D.res || {})[k] ?? "")}"><span class="unit">%</span></div>
+        <div class="ctl"><input id="jr-${k}" type="text" inputmode="decimal" autocomplete="off" value="${esc((D.res || {})[k] ?? "")}"><span class="unit">${u}</span></div>
       </div>`).join("");
 
     root.innerHTML = `
@@ -933,7 +937,7 @@ if (typeof document !== "undefined") {
     }
     function keep() {
       D.ton = $("jr-ton").value; D.note = $("jr-note").value;
-      D.res = {feed: $("jr-feed").value, tail: $("jr-tail").value, fconc: $("jr-fconc").value};
+      D.res = {}; RES_KEYS.forEach(k => { D.res[k] = $("jr-" + k).value; });
       persist();
     }
     const onLine = ev => {
@@ -956,7 +960,7 @@ if (typeof document !== "undefined") {
       persist(); drawLines();
       $(`jr-s-${D.lines.length - 1}`).focus();
     });
-    ["jr-ton", "jr-note", "jr-feed", "jr-tail", "jr-fconc"].forEach(id => $(id).addEventListener("input", () => { keep(); measure(); }));
+    ["jr-ton", "jr-note", ...RES_KEYS.map(k => "jr-" + k)].forEach(id => $(id).addEventListener("input", () => { keep(); measure(); }));
     drawLines();
 
     const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -969,11 +973,14 @@ if (typeof document !== "undefined") {
       keep(); say("jr-msg", "good", tr(LG.savedSet)); list();
     });
     $("jr-rsave").addEventListener("click", () => {
-      const v = {feed: $("jr-feed").value.trim(), tail: $("jr-tail").value.trim(), fconc: $("jr-fconc").value.trim()};
-      if (!v.feed && !v.tail && !v.fconc) return say("jr-rmsg", "bad", tr(LG.needRes));
+      const v = {}; RES_KEYS.forEach(k => { v[k] = $("jr-" + k).value.trim(); });
+      if (!RES_KEYS.some(k => v[k])) return say("jr-rmsg", "bad", tr(LG.needRes));
+      const inRange = (x, hi) => { const n = parseNum(x); return n >= 0 && n <= hi; };
+      if (v.ph && !inRange(v.ph, 14)) return say("jr-rmsg", "bad", tr(LG.badPh));
+      if (v.sol && !inRange(v.sol, 40)) return say("jr-rmsg", "bad", tr(LG.badSol));
       const e = {id: newId(), type: "res", date: $("jr-rdate").value || today(), time: $("jr-rtime").value || nowTime(), ...v};
       saved._log.push(e);
-      ["feed", "tail", "fconc"].forEach(k => { $("jr-" + k).value = ""; });
+      RES_KEYS.forEach(k => { $("jr-" + k).value = ""; });
       $("jr-rtime").value = nowTime();
       keep(); list();
       const link = splitLog(saved._log).results.find(x => x.r.id === e.id).set;
@@ -983,7 +990,7 @@ if (typeof document !== "undefined") {
     const delBtn = id => `<button type="button" class="btn small danger" data-del="${esc(id)}">${tr(LG.del)}</button>`;
     const resRow = (r, base) => `<div class="resrow">
         <span class="t">${esc(r.date === base ? r.time : stamp(r))}</span>
-        <span>${tr(LG.sFeed)} <b>${esc(r.feed || "–")}</b> %</span><span>${tr(LG.sTail)} <b>${esc(r.tail || "–")}</b> %</span><span>${tr(LG.sConc)} <b>${esc(r.fconc || "–")}</b> %</span>
+        ${r.feed || r.tail || r.fconc ? `<span>${tr(LG.sFeed)} <b>${esc(r.feed || "–")}</b> %</span><span>${tr(LG.sTail)} <b>${esc(r.tail || "–")}</b> %</span><span>${tr(LG.sConc)} <b>${esc(r.fconc || "–")}</b> %</span>` : ""}${r.ph ? `<span>${tr(LG.sPh)} <b>${esc(r.ph)}</b></span>` : ""}${r.sol ? `<span>${tr(LG.sSol)} <b>${esc(r.sol)}</b> %</span>` : ""}
         <span class="sp"></span>${delBtn(r.id)}
       </div>`;
     function list() {
