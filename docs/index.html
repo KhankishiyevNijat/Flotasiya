@@ -670,7 +670,7 @@ const REAGENTS = [["SIPX", 14], ["PAX", 10], ["PBX", 10], ["MIBC", 100], ["Jam c
 const POINTS = ["Feedbox", "148", "149", "151", "152", "153", "154", "161-162", "173-176", "181-184"];
 function doseGt(ml, s, conc, ton) { return (ml / s) * (conc / 100) * 3600 / ton; }
 const LG = {
-  setBox: ["Reagent ayarı", "Reagent setting"], resBox: ["Saatlıq nəticə", "Hourly result"],
+  setBox: ["Reagent ayarı", "Reagent setting"], resBox: ["Analiz nəticəsi", "Assay result"], phBox: ["pH və feed bərk faza", "pH and feed solids"],
   date: ["Tarix", "Date"], time: ["Saat", "Time"], ton: ["Tonnaj", "Tonnage"],
   reagent: ["Reagent", "Reagent"], point: ["Nöqtə", "Point"], conc: ["Qatılıq, %", "Strength, %"], ml: ["Qab, ml", "Cup, mL"], sec: ["Vaxt, san", "Time, s"], dose: ["Doza, q/t", "Dose, g/t"],
   addLine: ["+ Reagent / nöqtə əlavə et", "+ Add reagent / point"], remove: ["Sətri sil", "Remove line"],
@@ -679,18 +679,22 @@ const LG = {
   total: ["Cəmi", "Total"],
   note: ["Qeyd (istəyə görə)", "Note (optional)"],
   saveSet: ["Ayarı jurnala yaz", "Save setting to log"], savedSet: ["Reagent ayarı jurnala yazıldı.", "Reagent setting saved to the log."],
-  resHint: ["Nəticə çıxanda vaxtı ilə birlikdə yazın. Bütün xanalar istəyə görədir, bildiyinizi doldurun. Qeyd həmin vaxtda qüvvədə olan reagent ayarına özü bağlanır.", "Enter the result with its time when it comes in. Every field is optional, fill in what you have. The entry is linked to the reagent setting in use at that time."],
+  resHint: ["Nəticə çıxanda vaxtı ilə birlikdə yazın. Həmin vaxtda qüvvədə olan reagent ayarına özü bağlanır.", "Enter the result with its time when it comes in. It is linked to the reagent setting in use at that time."],
+  phHint: ["Saatlıq ölçməni öz vaxtı ilə yazın. İkisindən birini də yaza bilərsiniz.", "Enter the hourly reading with its own time. You can fill in just one of the two."],
+  savePh: ["Ölçməni jurnala yaz", "Save reading to log"], savedPh: ["Ölçmə jurnala yazıldı. Aid olduğu ayar:", "Reading saved to the log. Linked setting:"],
+  savedPhNone: ["Ölçmə jurnala yazıldı. Bu vaxtdan əvvəl reagent ayarı yoxdur.", "Reading saved to the log. There is no reagent setting before this time."],
+  needPh: ["pH və ya bərk faza faizini yazın.", "Enter the pH or the percent solids."],
   ph: ["pH", "pH"], sol: ["Feed bərk faza (çəki)", "Feed solids by weight"], sPh: ["pH", "pH"], sSol: ["Bərk faza", "Solids"],
   badPh: ["pH 0 ilə 14 arasında olmalıdır.", "pH must be between 0 and 14."],
   badSol: ["Feed bərk faza faizi 0 ilə 40 arasında olmalıdır.", "Feed percent solids must be between 0 and 40."],
   saveRes: ["Nəticəni jurnala yaz", "Save result to log"], savedRes: ["Nəticə jurnala yazıldı. Aid olduğu ayar:", "Result saved to the log. Linked setting:"],
   savedResNone: ["Nəticə jurnala yazıldı. Bu vaxtdan əvvəl reagent ayarı yoxdur.", "Result saved to the log. There is no reagent setting before this time."],
-  needRes: ["Ən azı bir xananı doldurun.", "Fill in at least one field."],
+  needRes: ["Ən azı bir Cu nəticəsi yazın.", "Enter at least one Cu result."],
   feed: ["Flotasiya feed Cu", "Flotation feed Cu"], tail: ["Rougher tail Cu", "Rougher tail Cu"], fconc: ["Final cleaner conc. Cu", "Final cleaner conc. Cu"],
   sFeed: ["Feed", "Feed"], sTail: ["Rg tail", "Rg tail"], sConc: ["Final conc.", "Final conc."],
   needTon: ["Tonnajı yazın (sıfırdan böyük).", "Enter the tonnage (greater than zero)."],
   needOne: ["Ən azı bir sətirdə qatılığı, qabın həcmini və dolma vaxtını yazın.", "Enter the strength, cup volume and fill time in at least one line."],
-  log: ["Jurnal", "Log"], nSets: ["ayar", "settings"], nRes: ["nəticə", "results"],
+  log: ["Jurnal", "Log"], nSets: ["ayar", "settings"], nRes: ["nəticə / ölçmə", "results / readings"],
   empty: ["Hələ qeyd yoxdur. Yuxarıda reagent ayarını yazıb jurnala əlavə edin.", "No entries yet. Enter a reagent setting above and save it to the log."],
   resOf: ["Bu ayarın nəticələri", "Results for this setting"], noRes: ["Bu ayar üçün hələ nəticə yoxdur.", "No results for this setting yet."],
   orphan: ["İlk ayardan əvvəlki nəticələr", "Results before the first setting"],
@@ -722,7 +726,7 @@ function migrateLog(log) {
 function splitLog(log) {
   const by = (a, b) => stamp(a).localeCompare(stamp(b));
   const sets = log.filter(e => e.type === "set").sort(by);
-  const results = log.filter(e => e.type === "res").sort(by).map(r => {
+  const results = log.filter(e => e.type === "res" || e.type === "ph").sort(by).map(r => {
     let set = null;
     sets.forEach(s => { if (stamp(s) <= stamp(r)) set = s; });
     return {r, set};
@@ -737,8 +741,11 @@ function totals(items) {
 const plain = (x, d) => isFinite(x) ? Number(x).toFixed(d) : "–";
 const REPORT_TITLE = "Shift report for reagent dosage";
 const SET_HEAD = ["Date / time", "Tonnage, t/h", "Reagent", "Point", "Strength, %", "Cup, mL", "Fill time, s", "Dose, g/t"];
-const RES_HEAD = ["Date / time", "Flotation feed Cu, %", "Rougher tail Cu, %", "Final cleaner conc. Cu, %", "pH", "Feed solids, wt %", "Reagent setting in use"];
-const RES_KEYS = ["feed", "tail", "fconc", "ph", "sol"];
+const RES_HEAD = ["Date / time", "Flotation feed Cu, %", "Rougher tail Cu, %", "Final cleaner conc. Cu, %", "Reagent setting in use"];
+const PH_HEAD = ["Date / time", "pH", "Feed solids, wt %", "Reagent setting in use"];
+const CU_KEYS = ["feed", "tail", "fconc"], PH_KEYS = ["ph", "sol"], RES_KEYS = [...CU_KEYS, ...PH_KEYS];
+// Rows for one of the two result tables: only entries that carry a value for those keys.
+const tableRows = (results, keys) => results.filter(({r}) => keys.some(k => r[k])).map(({r, set}) => [stamp(r), ...keys.map(k => r[k] || "–"), set ? stamp(set) : "–"]);
 const totalLine = items => "Total: " + totals(items).map(([n, v]) => `${n} ${plain(v, 2)} g/t`).join(" · ");
 function reportText(log) {
   const {sets, results} = splitLog(log), L = [REPORT_TITLE, "", "REAGENT SETTINGS", SET_HEAD.join("\t")];
@@ -748,8 +755,10 @@ function reportText(log) {
     L.push([stamp(s), "", totalLine(s.items)].join("\t"));
     if (s.note) L.push([stamp(s), "", "Note: " + clean(s.note)].join("\t"));
   });
-  L.push("", "HOURLY RESULTS", RES_HEAD.join("\t"));
-  results.forEach(({r, set}) => L.push([stamp(r), ...RES_KEYS.map(k => clean(r[k] || "–")), set ? stamp(set) : "–"].join("\t")));
+  L.push("", "ASSAY RESULTS", RES_HEAD.join("\t"));
+  tableRows(results, CU_KEYS).forEach(row => L.push(row.map(clean).join("\t")));
+  L.push("", "PH AND FEED SOLIDS", PH_HEAD.join("\t"));
+  tableRows(results, PH_KEYS).forEach(row => L.push(row.map(clean).join("\t")));
   return L.join("\n");
 }
 
@@ -825,13 +834,16 @@ if (typeof document !== "undefined") {
     doc.autoTable({startY: 36, head: [SET_HEAD], body, theme: "grid", styles: style, headStyles: head, margin: {left: 14, right: 14},
       columnStyles: {0: {cellWidth: 30}, 1: {cellWidth: 20, halign: "right"}, 4: {halign: "right"}, 5: {halign: "right"}, 6: {halign: "right"}, 7: {halign: "right", fontStyle: "bold"}}});
 
-    let y = doc.lastAutoTable.finalY + 11;
-    if (y > 265) { doc.addPage(); y = 20; }
-    title("Hourly results", y);
-    const rbody = results.map(({r, set}) => [stamp(r), ...RES_KEYS.map(k => r[k] || "–"), set ? stamp(set) : "–"]);
-    if (!results.length) rbody.push([{content: "No hourly results recorded.", colSpan: 7}]);
-    doc.autoTable({startY: y + 3, head: [RES_HEAD], body: rbody, theme: "grid", styles: style, headStyles: head, margin: {left: 14, right: 14},
-      columnStyles: {0: {cellWidth: 30}, 1: {halign: "right"}, 2: {halign: "right"}, 3: {halign: "right"}, 4: {halign: "right"}, 5: {halign: "right"}, 6: {cellWidth: 30}}});
+    const right = {halign: "right"};
+    [["Assay results", RES_HEAD, CU_KEYS, "No assay results recorded.", {0: {cellWidth: 30}, 1: right, 2: right, 3: right, 4: {cellWidth: 34}}],
+     ["pH and feed solids", PH_HEAD, PH_KEYS, "No pH or solids readings recorded.", {0: {cellWidth: 30}, 1: right, 2: right, 3: {cellWidth: 34}}]].forEach(([name, cols, keys, none, columnStyles]) => {
+      let y = doc.lastAutoTable.finalY + 11;
+      if (y > 265) { doc.addPage(); y = 20; }
+      title(name, y);
+      const rows = tableRows(results, keys);
+      if (!rows.length) rows.push([{content: none, colSpan: cols.length}]);
+      doc.autoTable({startY: y + 3, head: [cols], body: rows, theme: "grid", styles: style, headStyles: head, margin: {left: 14, right: 14}, columnStyles});
+    });
 
     const n = doc.getNumberOfPages();
     doc.setFont("rep", "normal"); doc.setFontSize(8); doc.setTextColor(120);
@@ -862,10 +874,14 @@ if (typeof document !== "undefined") {
     const opts = (list, sel) => list.map(v => `<option${v === sel ? " selected" : ""}>${esc(v)}</option>`).join("");
     const names = REAGENTS.map(r => r[0]);
     const num = (id, label, val, f) => `<label>${label}<input class="plain" id="${id}" data-f="${f}" type="text" inputmode="decimal" autocomplete="off" value="${esc(val ?? "")}"></label>`;
-    const resFields = () => [["feed", LG.feed, "%"], ["tail", LG.tail, "%"], ["fconc", LG.fconc, "%"], ["ph", LG.ph, "pH"], ["sol", LG.sol, "%"]].map(([k, l, u]) => `<div class="field">
+    const resFields = list => list.map(([k, l, u]) => `<div class="field">
         <label for="jr-${k}">${tr(l)}</label>
         <div class="ctl"><input id="jr-${k}" type="text" inputmode="decimal" autocomplete="off" value="${esc((D.res || {})[k] ?? "")}"><span class="unit">${u}</span></div>
       </div>`).join("");
+    const when = (d, t) => `<div class="fields g3 dt2">
+          <div class="field"><label for="${d}">${tr(LG.date)}</label><input class="plain" id="${d}" type="date" value="${today()}"></div>
+          <div class="field"><label for="${t}">${tr(LG.time)}</label><input class="plain" id="${t}" type="time" value="${nowTime()}"></div>
+        </div>`;
 
     root.innerHTML = `
       <div class="box stack" id="jr-setbox">
@@ -886,13 +902,18 @@ if (typeof document !== "undefined") {
       <div class="box stack" id="jr-resbox">
         <h3 style="margin:0">${tr(LG.resBox)}</h3>
         <p class="hint">${tr(LG.resHint)}</p>
-        <div class="fields g3 dt2">
-          <div class="field"><label for="jr-rdate">${tr(LG.date)}</label><input class="plain" id="jr-rdate" type="date" value="${today()}"></div>
-          <div class="field"><label for="jr-rtime">${tr(LG.time)}</label><input class="plain" id="jr-rtime" type="time" value="${nowTime()}"></div>
-        </div>
-        <div class="fields g3">${resFields()}</div>
+        ${when("jr-rdate", "jr-rtime")}
+        <div class="fields g3">${resFields([["feed", LG.feed, "%"], ["tail", LG.tail, "%"], ["fconc", LG.fconc, "%"]])}</div>
         <div class="btnrow"><button type="button" class="btn primary" id="jr-rsave">${tr(LG.saveRes)}</button></div>
         <div id="jr-rmsg" aria-live="polite"></div>
+      </div>
+      <div class="box stack" id="jr-phbox">
+        <h3 style="margin:0">${tr(LG.phBox)}</h3>
+        <p class="hint">${tr(LG.phHint)}</p>
+        ${when("jr-pdate", "jr-ptime")}
+        <div class="fields g3 dt2">${resFields([["ph", LG.ph, "pH"], ["sol", LG.sol, "%"]])}</div>
+        <div class="btnrow"><button type="button" class="btn primary" id="jr-psave">${tr(LG.savePh)}</button></div>
+        <div id="jr-pmsg" aria-live="polite"></div>
       </div>
       <div class="box stack">
         <h3 style="margin:0">${tr(LG.log)} · <span id="jr-count"></span></h3>
@@ -972,20 +993,23 @@ if (typeof document !== "undefined") {
       $("jr-note").value = ""; $("jr-time").value = nowTime();
       keep(); say("jr-msg", "good", tr(LG.savedSet)); list();
     });
-    $("jr-rsave").addEventListener("click", () => {
-      const v = {}; RES_KEYS.forEach(k => { v[k] = $("jr-" + k).value.trim(); });
-      if (!RES_KEYS.some(k => v[k])) return say("jr-rmsg", "bad", tr(LG.needRes));
+    // One handler for both result forms: Cu assays and pH / solids readings.
+    const saveResult = (type, keys, dateId, timeId, msgId, need, ok, okNone) => {
+      const v = {}; keys.forEach(k => { v[k] = $("jr-" + k).value.trim(); });
+      if (!keys.some(k => v[k])) return say(msgId, "bad", tr(need));
       const inRange = (x, hi) => { const n = parseNum(x); return n >= 0 && n <= hi; };
-      if (v.ph && !inRange(v.ph, 14)) return say("jr-rmsg", "bad", tr(LG.badPh));
-      if (v.sol && !inRange(v.sol, 40)) return say("jr-rmsg", "bad", tr(LG.badSol));
-      const e = {id: newId(), type: "res", date: $("jr-rdate").value || today(), time: $("jr-rtime").value || nowTime(), ...v};
+      if (v.ph && !inRange(v.ph, 14)) return say(msgId, "bad", tr(LG.badPh));
+      if (v.sol && !inRange(v.sol, 40)) return say(msgId, "bad", tr(LG.badSol));
+      const e = {id: newId(), type, date: $(dateId).value || today(), time: $(timeId).value || nowTime(), ...v};
       saved._log.push(e);
-      RES_KEYS.forEach(k => { $("jr-" + k).value = ""; });
-      $("jr-rtime").value = nowTime();
+      keys.forEach(k => { $("jr-" + k).value = ""; });
+      $(timeId).value = nowTime();
       keep(); list();
       const link = splitLog(saved._log).results.find(x => x.r.id === e.id).set;
-      say("jr-rmsg", "good", link ? `${tr(LG.savedRes)} ${esc(stamp(link))}.` : tr(LG.savedResNone));
-    });
+      say(msgId, "good", link ? `${tr(ok)} ${esc(stamp(link))}.` : tr(okNone));
+    };
+    $("jr-rsave").addEventListener("click", () => saveResult("res", CU_KEYS, "jr-rdate", "jr-rtime", "jr-rmsg", LG.needRes, LG.savedRes, LG.savedResNone));
+    $("jr-psave").addEventListener("click", () => saveResult("ph", PH_KEYS, "jr-pdate", "jr-ptime", "jr-pmsg", LG.needPh, LG.savedPh, LG.savedPhNone));
 
     const delBtn = id => `<button type="button" class="btn small danger" data-del="${esc(id)}">${tr(LG.del)}</button>`;
     const resRow = (r, base) => `<div class="resrow">
