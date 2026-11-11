@@ -708,7 +708,15 @@ const LG = {
   sure: ["Bütün qeydlər silinsin? Bu geri qaytarılmır.", "Delete all entries? This cannot be undone."],
   yes: ["Bəli, sil", "Yes, delete"], no: ["Xeyr", "No"], del: ["Sil", "Delete"], delSure: ["Silinsin?", "Delete?"],
   cleared: ["Bütün qeydlər silindi.", "All entries deleted."],
-  device: ["Qeydlər yalnız bu cihazda saxlanır. Silməzdən əvvəl hesabatı saxlayın.", "Entries are stored on this device only. Save the report before deleting."]
+  device: ["Qeydlər yalnız bu cihazda saxlanır. Silməzdən əvvəl hesabatı saxlayın.", "Entries are stored on this device only. Save the report before deleting."],
+  deviceCloud: ["Ortaq jurnala qoşulmusunuzsa, qeydlər kodu bilən bütün cihazlarda görünür. Silinən qeyd hamıda silinir.", "When connected to the shared log, entries appear on every device that knows the code. A deleted entry is deleted for everyone."],
+  cloud: ["Ortaq jurnal", "Shared log"],
+  cloudHint: ["Ortaq kodu yazıb qoşulun. Eyni kodu yazan bütün cihazlar eyni jurnalı görür.", "Enter the shared code to connect. Every device using the same code sees the same log."],
+  cloudCode: ["Ortaq kod", "Shared code"], cloudJoin: ["Qoşul", "Connect"], cloudLeave: ["Ayır", "Disconnect"], cloudNow: ["İndi yenilə", "Refresh now"],
+  cloudBad: ["Kod səhvdir. Yenidən yazın.", "The code is wrong. Enter it again."],
+  cloudBusy: ["Yenilənir…", "Refreshing…"], cloudOk: ["Qoşulub.", "Connected."], cloudAt: ["Son yenilənmə:", "Last refresh:"],
+  cloudOff: ["Bağlantı yoxdur. Qeydlər bu cihazda saxlanır və bağlantı gələndə göndəriləcək.", "No connection. Entries are kept on this device and will be sent when the connection returns."],
+  sureCloud: ["Bütün qeydlər bütün cihazlarda silinsin? Bu geri qaytarılmır.", "Delete all entries on every device? This cannot be undone."]
 };
 const stamp = e => `${e.date} ${e.time}`;
 // Older logs kept results inside the reagent entry; split them into separate entries.
@@ -861,6 +869,61 @@ if (typeof document !== "undefined") {
     return Promise.resolve();
   }
 
+  // Shared online log. Stays off until the Supabase project address and key are filled in.
+  const CLOUD = {url: "", key: ""};
+  const cloudOn = () => !!(CLOUD.url && CLOUD.key);
+  let cloudState = "idle", onCloudChange = null, drawCloud = null, syncing = null, syncAgain = false;
+  async function rpc(fn, body) {
+    const h = {"Content-Type": "application/json", apikey: CLOUD.key};
+    if (CLOUD.key.startsWith("eyJ")) h.Authorization = "Bearer " + CLOUD.key;
+    const r = await fetch(`${CLOUD.url.replace(/\/+$/, "")}/rest/v1/rpc/${fn}`, {method: "POST", headers: h, body: JSON.stringify(body)});
+    const t = await r.text();
+    if (!r.ok) { const e = new Error(t); e.badCode = /bad code/.test(t); throw e; }
+    return t ? JSON.parse(t) : null;
+  }
+  const setCloud = st => { cloudState = st; if (drawCloud) drawCloud(); };
+  const markDirty = id => { if (!Array.isArray(saved._dirty)) saved._dirty = []; if (!saved._dirty.includes(id)) saved._dirty.push(id); };
+  const markGone = ids => {
+    if (!Array.isArray(saved._gone)) saved._gone = [];
+    ids.forEach(id => { if (!saved._gone.includes(id)) saved._gone.push(id); });
+    saved._dirty = (saved._dirty || []).filter(id => !ids.includes(id));
+  };
+  // Send local changes, then take the shared list. Entries not yet sent are kept.
+  async function doSync() {
+    setCloud("busy");
+    try {
+      const code = saved._code, dirty = new Set(saved._dirty || []), gone = (saved._gone || []).slice();
+      const up = saved._log.filter(e => dirty.has(e.id)).map(e => ({id: e.id, data: e}));
+      if (up.length || gone.length) {
+        await rpc("shift_push", {p_code: code, p_entries: up, p_deleted: gone});
+        saved._dirty = (saved._dirty || []).filter(id => !up.some(u => u.id === id));
+        saved._gone = (saved._gone || []).filter(id => !gone.includes(id));
+        persist();
+      }
+      const rows = await rpc("shift_pull", {p_code: code}) || [];
+      const d2 = new Set(saved._dirty || []), g2 = new Set(saved._gone || []);
+      const remote = rows.map(r => r.data).filter(e => e && e.id && !g2.has(e.id));
+      const ids = new Set(remote.map(e => e.id));
+      saved._log = [...remote, ...saved._log.filter(e => d2.has(e.id) && !ids.has(e.id))];
+      saved._syncAt = Date.now(); persist();
+      setCloud("ok"); if (onCloudChange) onCloudChange();
+    } catch (e) {
+      if (e.badCode) { saved._code = ""; persist(); }
+      setCloud(e.badCode ? "code" : "off");
+    }
+  }
+  function sync() {
+    if (!cloudOn() || !saved._code) return Promise.resolve();
+    if (syncing) { syncAgain = true; return syncing; }
+    syncing = doSync().finally(() => { syncing = null; if (syncAgain) { syncAgain = false; sync(); } });
+    return syncing;
+  }
+  if (cloudOn()) {
+    setInterval(() => { if (!document.hidden && current === "jurnal") sync(); }, 30000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) sync(); });
+    window.addEventListener("online", () => sync());
+  }
+
   function renderLog(root) {
     saved._log = migrateLog(saved._log);
     if (!saved._draft || typeof saved._draft !== "object") saved._draft = {ton: "625"};
@@ -884,6 +947,7 @@ if (typeof document !== "undefined") {
         </div>`;
 
     root.innerHTML = `
+      <div class="box stack" id="jr-cloud" hidden></div>
       <div class="box stack" id="jr-setbox">
         <h3 style="margin:0">${tr(LG.setBox)}</h3>
         <div class="fields g3 dt">
@@ -924,7 +988,7 @@ if (typeof document !== "undefined") {
         </div>
         <div id="jr-logmsg" aria-live="polite"></div>
         <div class="stack" id="jr-list"></div>
-        <p class="hint">${tr(LG.device)}</p>
+        <p class="hint">${tr(cloudOn() ? LG.deviceCloud : LG.device)}</p>
       </div>`;
 
     const $ = id => document.getElementById(id);
@@ -984,12 +1048,46 @@ if (typeof document !== "undefined") {
     ["jr-ton", "jr-note", ...RES_KEYS.map(k => "jr-" + k)].forEach(id => $(id).addEventListener("input", () => { keep(); measure(); }));
     drawLines();
 
+    // Shared log box
+    drawCloud = () => {
+      const el = $("jr-cloud"); if (!el) return;
+      if (!saved._code) {
+        el.innerHTML = `<h3 style="margin:0">${tr(LG.cloud)}</h3>
+          <p class="hint">${tr(LG.cloudHint)}</p>
+          <div class="btnrow"><input class="plain" id="jr-code" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="${tr(LG.cloudCode)}" placeholder="${tr(LG.cloudCode)}" style="flex:1 1 160px;width:auto">
+            <button type="button" class="btn primary" data-cloud="join">${tr(LG.cloudJoin)}</button></div>
+          ${cloudState === "code" ? `<div class="msg bad"><b>${tr(UI.bad)}</b>${tr(LG.cloudBad)}</div>` : ""}`;
+        return;
+      }
+      const t = saved._syncAt ? new Date(saved._syncAt) : null;
+      const line = cloudState === "busy" ? tr(LG.cloudBusy)
+        : cloudState === "off" ? tr(LG.cloudOff)
+        : `${tr(LG.cloudOk)}${t ? ` ${tr(LG.cloudAt)} ${pad(t.getHours())}:${pad(t.getMinutes())}` : ""}`;
+      el.innerHTML = `<h3 style="margin:0">${tr(LG.cloud)}</h3>
+        <div class="msg ${cloudState === "off" ? "warn" : "good"}">${line}</div>
+        <div class="btnrow"><button type="button" class="btn" data-cloud="now">${tr(LG.cloudNow)}</button><button type="button" class="btn" data-cloud="leave">${tr(LG.cloudLeave)}</button></div>`;
+    };
+    if (cloudOn()) {
+      $("jr-cloud").hidden = false;
+      $("jr-cloud").addEventListener("click", ev => {
+        const b = ev.target.closest("[data-cloud]"); if (!b) return;
+        if (b.dataset.cloud === "join") {
+          const code = $("jr-code").value.trim(); if (!code) return;
+          saved._code = code; saved._log.forEach(e => markDirty(e.id)); persist(); sync();
+        } else if (b.dataset.cloud === "now") sync();
+        else { saved._code = ""; persist(); setCloud("idle"); }
+      });
+      $("jr-cloud").addEventListener("keydown", ev => { if (ev.key === "Enter" && ev.target.id === "jr-code") $("jr-cloud").querySelector('[data-cloud="join"]').click(); });
+      drawCloud();
+    }
+
     const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     $("jr-save").addEventListener("click", () => {
       const m = measure();
       if (!(m.ton > 0)) return say("jr-msg", "bad", tr(LG.needTon));
       if (!m.items.length) return say("jr-msg", "bad", tr(LG.needOne));
-      saved._log.push({id: newId(), type: "set", date: $("jr-date").value || today(), time: $("jr-time").value || nowTime(), ton: m.ton, items: m.items, note: $("jr-note").value.trim()});
+      const e = {id: newId(), type: "set", date: $("jr-date").value || today(), time: $("jr-time").value || nowTime(), ton: m.ton, items: m.items, note: $("jr-note").value.trim()};
+      saved._log.push(e); markDirty(e.id); sync();
       $("jr-note").value = ""; $("jr-time").value = nowTime();
       keep(); say("jr-msg", "good", tr(LG.savedSet)); list();
     });
@@ -1001,7 +1099,7 @@ if (typeof document !== "undefined") {
       if (v.ph && !inRange(v.ph, 14)) return say(msgId, "bad", tr(LG.badPh));
       if (v.sol && !inRange(v.sol, 40)) return say(msgId, "bad", tr(LG.badSol));
       const e = {id: newId(), type, date: $(dateId).value || today(), time: $(timeId).value || nowTime(), ...v};
-      saved._log.push(e);
+      saved._log.push(e); markDirty(e.id); sync();
       keys.forEach(k => { $("jr-" + k).value = ""; });
       $(timeId).value = nowTime();
       keep(); list();
@@ -1039,10 +1137,12 @@ if (typeof document !== "undefined") {
     }
     $("jr-list").addEventListener("click", ev => {
       const b = ev.target.closest("[data-del]"); if (!b) return;
-      if (b.dataset.armed) { saved._log = saved._log.filter(x => x.id !== b.dataset.del); persist(); list(); }
+      if (b.dataset.armed) { saved._log = saved._log.filter(x => x.id !== b.dataset.del); markGone([b.dataset.del]); persist(); list(); sync(); }
       else { b.dataset.armed = "1"; b.textContent = tr(LG.delSure); }
     });
     list();
+    onCloudChange = list;
+    sync();
 
     $("jr-copy").addEventListener("click", () => {
       if (!saved._log.length) return say("jr-logmsg", "warn", tr(LG.nothing));
@@ -1060,10 +1160,10 @@ if (typeof document !== "undefined") {
     });
     $("jr-clear").addEventListener("click", () => {
       if (!saved._log.length) return say("jr-logmsg", "warn", tr(LG.nothing));
-      $("jr-logmsg").innerHTML = `<div class="msg bad">${tr(LG.sure)}
+      $("jr-logmsg").innerHTML = `<div class="msg bad">${tr(cloudOn() && saved._code ? LG.sureCloud : LG.sure)}
         <div class="btnrow" style="margin-top:8px"><button type="button" class="btn danger" id="jr-yes">${tr(LG.yes)}</button><button type="button" class="btn" id="jr-no">${tr(LG.no)}</button></div></div>`;
       $("jr-no").addEventListener("click", () => say("jr-logmsg", "", ""));
-      $("jr-yes").addEventListener("click", () => { saved._log = []; persist(); list(); say("jr-logmsg", "good", tr(LG.cleared)); });
+      $("jr-yes").addEventListener("click", () => { markGone(saved._log.map(e => e.id)); saved._log = []; persist(); list(); sync(); say("jr-logmsg", "good", tr(LG.cleared)); });
     });
   }
 
