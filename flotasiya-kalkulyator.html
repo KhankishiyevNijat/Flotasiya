@@ -152,6 +152,22 @@ select.plain { padding: 8px 6px; }
 .resrow .t { font-weight: 600; }
 .resrow .sp { flex: 1; }
 .sub { font: 600 12px var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.rec { position: relative; overflow: hidden; }
+.rec-in { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; }
+.ringwrap { position: relative; width: 136px; height: 136px; flex: 0 0 auto; }
+.ring { width: 100%; height: 100%; display: block; }
+.ring-bg { fill: none; stroke: var(--sunken); stroke-width: 10; }
+.ring-fg { fill: none; stroke: var(--accent); stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1.2s cubic-bezier(.2, .8, .2, 1); }
+.rec-num { position: absolute; inset: 0; display: flex; align-items: baseline; justify-content: center; padding-top: 46px; font-family: var(--font-display); font-weight: 600; font-size: 32px; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.rec-num small { font-size: 15px; margin-left: 2px; }
+.rec-info { min-width: 0; flex: 1 1 180px; display: flex; flex-direction: column; gap: 5px; }
+.rec-info p { margin: 0; }
+.rec-info .vals { font-weight: 600; font-variant-numeric: tabular-nums; }
+.rec-info .up { color: var(--good); font-weight: 600; } .rec-info .down { color: var(--bad); font-weight: 600; }
+.bubbles { position: absolute; inset: 0; pointer-events: none; }
+.bubbles i { position: absolute; bottom: -26px; border-radius: 50%; border: 1.5px solid var(--accent); opacity: 0; animation: rise linear infinite; }
+@keyframes rise { 0% { transform: translateY(0) scale(.6); opacity: 0; } 15% { opacity: .32; } 100% { transform: translateY(-240px) scale(1.15); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .bubbles { display: none; } .ring-fg { transition: none; } }
 .hint { color: var(--muted); font-size: 12.5px; margin: 0; }
 .entry { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .entry-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; }
@@ -642,6 +658,7 @@ const MODS = [
   formulas: [
     ["Doza (q/t) = (Qab ml / Vaxt san) × (Qatılıq % / 100) × 3600 / Tonnaj (t/saat)", "Dose (g/t) = (Cup mL / Time s) × (Strength % / 100) × 3600 / Tonnage (t/h)"],
     ["Nümunə: SIPX 14 %, 100 ml qab 30 saniyəyə dolur, 625 t/saat. Doza = (100 / 30) × 0.14 × 3600 / 625 = 2.69 q/t", "Example: SIPX 14 %, a 100 mL cup fills in 30 s, 625 t/h. Dose = (100 / 30) × 0.14 × 3600 / 625 = 2.69 g/t"],
+    ["Recovery = (Feed Cu − Tail Cu) / Feed Cu × 100. Ən son feed və rougher tail Cu nəticəsindən hesablanır.", "Recovery = (Feed Cu − Tail Cu) / Feed Cu × 100. Calculated from the latest feed and rougher tail Cu result."],
     ["100 %-li maye reagentlərdə (MIBC və s.) nəticə əslində ml/t-dur. Qram almaq üçün sıxlığa vurmaq lazımdır.", "For 100 % liquid reagents (MIBC etc.) the result is really mL/t. Multiply by the density to get grams."]
   ]
 }
@@ -691,6 +708,10 @@ const LG = {
   cleared: ["Bütün qeydlər silindi.", "All entries deleted."],
   device: ["Qeydlər yalnız bu cihazda saxlanır. Silməzdən əvvəl hesabatı saxlayın.", "Entries are stored on this device only. Save the report before deleting."],
   deviceCloud: ["Ortaq jurnala qoşulmusunuzsa, qeydlər kodu bilən bütün cihazlarda görünür. Silinən qeyd hamıda silinir.", "When connected to the shared log, entries appear on every device that knows the code. A deleted entry is deleted for everyone."],
+  recTitle: ["Hazırkı recovery", "Current recovery"], recBy: ["nəticəsinə görə", "Based on the result at"],
+  recEmpty: ["Recovery-ni görmək üçün feed və rougher tail Cu nəticəsini jurnala yazın.", "Save a feed and rougher tail Cu result to the log to see the recovery."],
+  recPrev: ["Əvvəlki nəticə", "Previous result"],
+  recBad: ["Tail Cu feed Cu-dan böyük və ya ona bərabərdir. Analizləri yoxlayın.", "Tail Cu is equal to or higher than feed Cu. Check the assays."],
   cloud: ["Ortaq jurnal", "Shared log"],
   cloudHint: ["Ortaq kodu yazıb qoşulun. Eyni kodu yazan bütün cihazlar eyni jurnalı görür.", "Enter the shared code to connect. Every device using the same code sees the same log."],
   cloudCode: ["Ortaq kod", "Shared code"], cloudJoin: ["Qoşul", "Connect"], cloudLeave: ["Ayır", "Disconnect"], cloudNow: ["İndi yenilə", "Refresh now"],
@@ -728,6 +749,14 @@ function totals(items) {
   return [...m.entries()];
 }
 const plain = (x, d) => isFinite(x) ? Number(x).toFixed(d) : "–";
+// Latest result that has both feed and rougher tail Cu, and the one before it.
+function recoveryFrom(log) {
+  const pts = log.filter(e => e.type === "res").map(e => ({e, feed: parseNum(e.feed), tail: parseNum(e.tail)}))
+    .filter(x => x.feed > 0 && x.tail >= 0)
+    .sort((a, b) => stamp(a.e).localeCompare(stamp(b.e)))
+    .map(x => ({...x, r: (x.feed - x.tail) / x.feed * 100}));
+  return {cur: pts[pts.length - 1] || null, prev: pts[pts.length - 2] || null};
+}
 const REPORT_TITLE = "Shift report for reagent dosage";
 const SET_HEAD = ["Date / time", "Tonnage, t/h", "Reagent", "Point", "Strength, %", "Cup, mL", "Fill time, s", "Dose, g/t"];
 const RES_HEAD = ["Date / time", "Flotation feed Cu, %", "Rougher tail Cu, %", "Final cleaner conc. Cu, %", "Reagent setting in use"];
@@ -853,6 +882,7 @@ if (typeof document !== "undefined") {
   // Shared online log. The key below is the public (publishable) one; access is gated by the shared code.
   const CLOUD = {url: "https://hjdavobmepmdiraidgut.supabase.co", key: "sb_publishable_qDU0NEUVepZ3n3gpWPxVKA_Sp7ghSBe"};
   const cloudOn = () => !!(CLOUD.url && CLOUD.key);
+  let lastRec = null;
   let cloudState = "idle", onCloudChange = null, drawCloud = null, syncing = null, syncAgain = false;
   async function rpc(fn, body) {
     const h = {"Content-Type": "application/json", apikey: CLOUD.key};
@@ -928,6 +958,7 @@ if (typeof document !== "undefined") {
         </div>`;
 
     root.innerHTML = `
+      <div class="box rec" id="jr-rec"></div>
       <div class="box stack" id="jr-cloud" hidden></div>
       <div class="box stack" id="jr-setbox">
         <h3 style="margin:0">${tr(LG.setBox)}</h3>
@@ -1096,7 +1127,49 @@ if (typeof document !== "undefined") {
         ${r.feed || r.tail || r.fconc ? `<span>${tr(LG.sFeed)} <b>${esc(r.feed || "–")}</b> %</span><span>${tr(LG.sTail)} <b>${esc(r.tail || "–")}</b> %</span><span>${tr(LG.sConc)} <b>${esc(r.fconc || "–")}</b> %</span>` : ""}${r.ph ? `<span>${tr(LG.sPh)} <b>${esc(r.ph)}</b></span>` : ""}${r.sol ? `<span>${tr(LG.sSol)} <b>${esc(r.sol)}</b> %</span>` : ""}
         <span class="sp"></span>${delBtn(r.id)}
       </div>`;
+    // Current recovery card: ring fills and the number counts up when the value changes.
+    function drawRec() {
+      const el = $("jr-rec"), {cur, prev} = recoveryFrom(saved._log);
+      const key = cur ? `${cur.r}|${stamp(cur.e)}|${prev ? prev.r : ""}|${LANG}` : "none|" + LANG;
+      if (el.dataset.key === key) return;
+      el.dataset.key = key;
+      if (!cur) { lastRec = null; el.innerHTML = `<h3 style="margin:0">${tr(LG.recTitle)}</h3><p class="note">${tr(LG.recEmpty)}</p>`; return; }
+      const C = 2 * Math.PI * 52, frac = x => Math.max(0, Math.min(100, x)) / 100;
+      const from = lastRec ?? 0, d = prev ? cur.r - prev.r : 0;
+      const bubbles = [[6, 14, 7, 0], [17, 9, 5.5, 1.2], [29, 18, 8, 2.6], [43, 11, 6, .6], [57, 15, 7.5, 3.4], [69, 8, 5, 1.9], [80, 20, 9, .3], [91, 12, 6.5, 2.2]]
+        .map(([l, s, t, dl]) => `<i style="left:${l}%;width:${s}px;height:${s}px;animation-duration:${t}s;animation-delay:${dl}s"></i>`).join("");
+      el.innerHTML = `<div class="bubbles" aria-hidden="true">${bubbles}</div>
+        <div class="rec-in">
+          <div class="ringwrap">
+            <svg class="ring" viewBox="0 0 120 120" role="img" aria-label="${tr(LG.recTitle)} ${fmt(cur.r, 1)} %">
+              <circle class="ring-bg" cx="60" cy="60" r="52"></circle>
+              <circle class="ring-fg" id="jr-ring" cx="60" cy="60" r="52" transform="rotate(-90 60 60)" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - frac(from))}"></circle>
+            </svg>
+            <div class="rec-num"><span id="jr-recval">${fmt(from, 1)}</span><small>%</small></div>
+          </div>
+          <div class="rec-info">
+            <p class="sub">${tr(LG.recTitle)}</p>
+            <p class="vals">${tr(LG.sFeed)} ${esc(cur.e.feed)} % · ${tr(LG.sTail)} ${esc(cur.e.tail)} %</p>
+            <p class="note">${LANG ? `${tr(LG.recBy)} ${esc(stamp(cur.e))}` : `${esc(stamp(cur.e))} ${tr(LG.recBy)}`}</p>
+            ${prev ? `<p class="note">${tr(LG.recPrev)}: ${fmt(prev.r, 1)} % <span class="${d >= 0 ? "up" : "down"}">${d >= 0 ? "▲" : "▼"} ${fmt(Math.abs(d), 1)}</span></p>` : ""}
+            ${cur.tail >= cur.feed ? `<p class="note down">${tr(LG.recBad)}</p>` : ""}
+          </div>
+        </div>`;
+      const target = cur.r; lastRec = target;
+      const ring = $("jr-ring"), val = $("jr-recval");
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) { ring.setAttribute("stroke-dashoffset", C * (1 - frac(target))); val.textContent = fmt(target, 1); return; }
+      requestAnimationFrame(() => requestAnimationFrame(() => ring.setAttribute("stroke-dashoffset", C * (1 - frac(target)))));
+      const t0 = performance.now(), dur = 1200;
+      const step = now => {
+        if (!val.isConnected) return;
+        const k = Math.min(1, (now - t0) / dur), ease = 1 - Math.pow(1 - k, 3);
+        val.textContent = fmt(from + (target - from) * ease, 1);
+        if (k < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
     function list() {
+      drawRec();
       const {sets, results} = splitLog(saved._log);
       $("jr-count").textContent = `${sets.length} ${tr(LG.nSets)} · ${results.length} ${tr(LG.nRes)}`;
       const box = $("jr-list");
