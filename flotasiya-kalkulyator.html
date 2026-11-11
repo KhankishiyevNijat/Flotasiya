@@ -122,6 +122,42 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
 th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 th { color: var(--muted); font-weight: 500; }
 th:first-child, td:first-child { text-align: left; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn {
+  font: 600 14px var(--font-body); color: var(--fg); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 6px; padding: 9px 14px; cursor: pointer;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.btn.danger { color: var(--bad); border-color: var(--bad); }
+.btn.small { font-size: 13px; padding: 5px 10px; }
+.plain {
+  width: 100%; min-width: 0; font: 500 16px var(--font-body); font-variant-numeric: tabular-nums;
+  color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+}
+.rgrid {
+  display: grid; grid-template-columns: minmax(72px, 1.5fr) repeat(3, minmax(0, 1fr)) minmax(52px, 1fr);
+  gap: 6px; align-items: center;
+}
+.rgrid .h { font-size: 12px; color: var(--muted); font-weight: 500; line-height: 1.25; }
+.rgrid .h:last-child, .rgrid .ds { text-align: right; }
+.rgrid .nm { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.rgrid input { padding: 7px 6px; font-size: 15px; }
+.rgrid .ds { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--accent); }
+@media (max-width: 520px) {
+  .fields.g3.dt { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fields.g3.dt .field:last-child { grid-column: 1 / -1; }
+}
+.hint { color: var(--muted); font-size: 12.5px; margin: 0; }
+.entry { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.entry-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; }
+.entry-head .when { font-family: var(--font-display); font-weight: 600; font-size: 16px; }
+.entry-head .ton { color: var(--muted); font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--sunken); border-radius: 6px; padding: 5px 8px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.chip small { color: var(--muted); margin-left: 4px; }
+.note { color: var(--muted); font-size: 13.5px; overflow-wrap: anywhere; margin: 0; }
+textarea.rep { width: 100%; min-height: 120px; font: 12px ui-monospace, Menlo, Consolas, monospace; color: var(--fg); background: var(--sunken); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
 .formulas { color: var(--muted); font-size: 13.5px; }
 .formulas ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 footer { color: var(--muted); font-size: 13px; max-width: 75ch; }
@@ -593,8 +629,59 @@ const MODS = [
     ["k zavod = k lab / scale-up əmsalı. Zavod k-sını və R∞-u Kinetika moduluna yazın.", "Plant k = lab k / scale-up factor. Enter the plant k and R∞ in the Kinetics module."],
     ["Hesablanmış başlanğıc tərkibi qidalandırmanın analizi ilə müqayisə edin. Fərq 5–10 %-dən çoxdursa, testi təkrarlayın.", "Compare the calculated head grade with the feed assay. If they differ by more than 5–10 %, repeat the test."]
   ]
+},
+{
+  id: "jurnal", name: ["Reagent jurnalı", "Reagent log"], title: ["Reagent dozası və növbə jurnalı", "Reagent dose and shift log"], custom: true,
+  intro: ["Ölçü qabının dolma vaxtından reagentin dozasını (q/t) hesablayır. Hər dəyişikliyi jurnala yazın, analiz nəticələrini sonra əlavə edin və növbənin sonunda hesabatı saxlayın.",
+          "Calculates reagent dose (g/t) from the time it takes to fill a measuring cup. Save each change to the log, add assay results later and save the report at the end of the shift."],
+  inputs: [],
+  formulas: [
+    ["Doza (q/t) = (Qab ml / Vaxt san) × (Qatılıq % / 100) × 3600 / Tonnaj (t/saat)", "Dose (g/t) = (Cup mL / Time s) × (Strength % / 100) × 3600 / Tonnage (t/h)"],
+    ["Nümunə: SIPX 14 %, 100 ml qab 30 saniyəyə dolur, 625 t/saat. Doza = (100 / 30) × 0.14 × 3600 / 625 = 2.69 q/t", "Example: SIPX 14 %, a 100 mL cup fills in 30 s, 625 t/h. Dose = (100 / 30) × 0.14 × 3600 / 625 = 2.69 g/t"],
+    ["100 %-li maye reagentlərdə (MIBC və s.) nəticə əslində ml/t-dur. Qram almaq üçün sıxlığa vurmaq lazımdır.", "For 100 % liquid reagents (MIBC etc.) the result is really mL/t. Multiply by the density to get grams."]
+  ]
 }
 ];
+
+const REAGENTS = [["SIPX", 14], ["PAX", 10], ["PBX", 10], ["MIBC", 100], ["Jam collector", 100], ["MX 3754", 100], ["MX 5151", 100]];
+function doseGt(ml, s, conc, ton) { return (ml / s) * (conc / 100) * 3600 / ton; }
+const LG = {
+  newEntry: ["Yeni qeyd", "New entry"], date: ["Tarix", "Date"], time: ["Saat", "Time"], ton: ["Tonnaj", "Tonnage"],
+  reagent: ["Reagent", "Reagent"], conc: ["Qatılıq, %", "Strength, %"], ml: ["Qab, ml", "Cup, mL"], sec: ["Vaxt, san", "Time, s"], dose: ["Doza, q/t", "Dose, g/t"],
+  hintRow: ["Ölçmədiyiniz reagentin vaxt xanasını boş saxlayın.", "Leave the time empty for any reagent you did not measure."],
+  note: ["Qeyd (istəyə görə)", "Note (optional)"],
+  results: ["Analiz nəticələri (sonra da yaza bilərsiniz)", "Assay results (can be added later)"],
+  feed: ["Flotasiya feed Cu", "Flotation feed Cu"], tail: ["Rougher tail Cu", "Rougher tail Cu"], fconc: ["Final cleaner conc. Cu", "Final cleaner conc. Cu"],
+  save: ["Jurnala yaz", "Save to log"], saved: ["Qeyd jurnala yazıldı.", "Entry saved to the log."],
+  needTon: ["Tonnajı yazın (sıfırdan böyük).", "Enter the tonnage (greater than zero)."],
+  needOne: ["Ən azı bir reagent üçün qabın həcmini və dolma vaxtını yazın.", "Enter the cup volume and fill time for at least one reagent."],
+  log: ["Jurnal", "Log"], count: ["qeyd", "entries"],
+  empty: ["Hələ qeyd yoxdur. Yuxarıda reagentləri ölçüb «Jurnala yaz» düyməsinə basın.", "No entries yet. Measure the reagents above and press “Save to log”."],
+  copy: ["Hesabatı kopyala", "Copy report"], xlsx: ["Excel hesabatı yüklə", "Download Excel report"], clear: ["Bütün qeydləri sil", "Delete all entries"],
+  copied: ["Hesabat kopyalandı. Excel-ə və ya mesaja yapışdıra bilərsiniz.", "Report copied. You can paste it into Excel or a message."],
+  copyManual: ["Avtomatik kopyalanmadı. Aşağıdakı mətni seçib kopyalayın.", "Automatic copy did not work. Select and copy the text below."],
+  downloaded: ["Hesabat faylı yükləndi.", "Report file downloaded."],
+  nothing: ["Jurnal boşdur, hesabat üçün qeyd yoxdur.", "The log is empty, there is nothing to report."],
+  sure: ["Bütün qeydlər silinsin? Bu geri qaytarılmır.", "Delete all entries? This cannot be undone."],
+  yes: ["Bəli, sil", "Yes, delete"], no: ["Xeyr", "No"], del: ["Sil", "Delete"], delSure: ["Silinsin?", "Delete?"],
+  cleared: ["Bütün qeydlər silindi.", "All entries deleted."],
+  device: ["Qeydlər yalnız bu cihazda saxlanır. Silməzdən əvvəl hesabatı saxlayın.", "Entries are stored on this device only. Save the report before deleting."],
+  rDate: ["Tarix", "Date"], rTime: ["Saat", "Time"], rTon: ["Tonnaj, t/saat", "Tonnage, t/h"], rNote: ["Qeyd", "Note"],
+  rFeed: ["Flotasiya feed Cu, %", "Flotation feed Cu, %"], rTail: ["Rougher tail Cu, %", "Rougher tail Cu, %"], rConc: ["Final cleaner conc. Cu, %", "Final cleaner conc. Cu, %"],
+  sheet: ["Hesabat", "Report"], file: ["flotasiya-hesabat", "flotation-report"]
+};
+// Report as rows of cells: first row is the header, numbers stay numbers.
+function reportRows(log) {
+  const sorted = log.slice().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  const names = REAGENTS.map(r => r[0]).filter(n => sorted.some(e => e.items.some(i => i.name === n)));
+  const unit = tr(U.gpt);
+  const head = [tr(LG.rDate), tr(LG.rTime), tr(LG.rTon), ...names.map(n => `${n}, ${unit}`), tr(LG.rFeed), tr(LG.rTail), tr(LG.rConc), tr(LG.rNote)];
+  const num = x => { const n = parseNum(x); return isFinite(n) ? n : ""; };
+  const rows = sorted.map(e => [e.date, e.time, e.ton,
+    ...names.map(n => { const i = e.items.find(i => i.name === n); return i ? Math.round(i.dose * 1000) / 1000 : ""; }),
+    num(e.feed), num(e.tail), num(e.fconc), e.note || ""]);
+  return [head, ...rows];
+}
 
 function fmt(x, d) {
   if (!isFinite(x)) return "–";
@@ -618,6 +705,179 @@ if (typeof document !== "undefined") {
   const nav = document.getElementById("nav"), panels = document.getElementById("panels");
   const inputId = (m, i) => `${m.id}-${i.k}`;
 
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  const pad = n => String(n).padStart(2, "0");
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+  const nowTime = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  let xlsxLoading = null;
+  function loadXlsx() {
+    if (window.XLSX) return Promise.resolve();
+    // The installed app ships its own copy; the CDN is the fallback elsewhere.
+    const srcs = ["xlsx.mini.min.js", "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.mini.min.js"];
+    const tryLoad = i => new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = srcs[i];
+      s.onload = () => window.XLSX ? res() : rej(new Error("xlsx"));
+      s.onerror = () => { s.remove(); i + 1 < srcs.length ? tryLoad(i + 1).then(res, rej) : rej(new Error("xlsx")); };
+      document.head.appendChild(s);
+    });
+    if (!xlsxLoading) xlsxLoading = tryLoad(0).catch(e => { xlsxLoading = null; throw e; });
+    return xlsxLoading;
+  }
+
+  function renderLog(root) {
+    if (!Array.isArray(saved._log)) saved._log = [];
+    if (!saved._draft || typeof saved._draft !== "object") saved._draft = {ton: "625", note: "", feed: "", tail: "", fconc: "", r: {0: {s: "30"}}};
+    const D = saved._draft; if (!D.r) D.r = {};
+    const rv = (i, k) => { const r = D.r[i] || {}; return r[k] ?? (k === "c" ? String(REAGENTS[i][1]) : k === "ml" ? "100" : ""); };
+    const resultFields = (prefix, vals) => [["feed", LG.feed], ["tail", LG.tail], ["fconc", LG.fconc]].map(([k, l]) => `<div class="field">
+        <label for="${prefix}-${k}">${tr(l)}</label>
+        <div class="ctl"><input id="${prefix}-${k}" data-k="${k}" type="text" inputmode="decimal" autocomplete="off" value="${esc(vals[k] ?? "")}"><span class="unit">%</span></div>
+      </div>`).join("");
+
+    root.innerHTML = `
+      <div class="box stack">
+        <h3 style="margin:0">${tr(LG.newEntry)}</h3>
+        <div class="fields g3 dt">
+          <div class="field"><label for="jr-date">${tr(LG.date)}</label><input class="plain" id="jr-date" type="date" value="${today()}"></div>
+          <div class="field"><label for="jr-time">${tr(LG.time)}</label><input class="plain" id="jr-time" type="time" value="${nowTime()}"></div>
+          <div class="field"><label for="jr-ton">${tr(LG.ton)}, ${tr(U.tph)}</label><input class="plain" id="jr-ton" type="text" inputmode="decimal" autocomplete="off" value="${esc(D.ton ?? "")}"></div>
+        </div>
+        <div class="rgrid">
+          <div class="h">${tr(LG.reagent)}</div><div class="h">${tr(LG.conc)}</div><div class="h">${tr(LG.ml)}</div><div class="h">${tr(LG.sec)}</div><div class="h">${tr(LG.dose)}</div>
+          ${REAGENTS.map((r, i) => `<div class="nm">${r[0]}</div>
+            <input class="plain" id="jr-c-${i}" aria-label="${r[0]} ${tr(LG.conc)}" type="text" inputmode="decimal" autocomplete="off" value="${esc(rv(i, "c"))}">
+            <input class="plain" id="jr-ml-${i}" aria-label="${r[0]} ${tr(LG.ml)}" type="text" inputmode="decimal" autocomplete="off" value="${esc(rv(i, "ml"))}">
+            <input class="plain" id="jr-s-${i}" aria-label="${r[0]} ${tr(LG.sec)}" type="text" inputmode="decimal" autocomplete="off" value="${esc(rv(i, "s"))}">
+            <div class="ds" id="jr-d-${i}">–</div>`).join("")}
+        </div>
+        <p class="hint">${tr(LG.hintRow)}</p>
+        <div class="field"><label for="jr-note">${tr(LG.note)}</label><input class="plain" id="jr-note" type="text" autocomplete="off" value="${esc(D.note ?? "")}"></div>
+        <div>
+          <div class="field"><label>${tr(LG.results)}</label></div>
+          <div class="fields g3">${resultFields("jr", D)}</div>
+        </div>
+        <div class="btnrow"><button type="button" class="btn primary" id="jr-save">${tr(LG.save)}</button></div>
+        <div id="jr-msg" aria-live="polite"></div>
+      </div>
+      <div class="box stack">
+        <div class="entry-head"><h3 style="margin:0">${tr(LG.log)} · <span id="jr-count"></span></h3></div>
+        <div class="btnrow" id="jr-actions">
+          <button type="button" class="btn" id="jr-copy">${tr(LG.copy)}</button>
+          <button type="button" class="btn" id="jr-xlsx">${tr(LG.xlsx)}</button>
+          <button type="button" class="btn danger" id="jr-clear">${tr(LG.clear)}</button>
+        </div>
+        <div id="jr-logmsg" aria-live="polite"></div>
+        <div class="stack" id="jr-list"></div>
+        <p class="hint">${tr(LG.device)}</p>
+      </div>`;
+
+    const $ = id => document.getElementById(id);
+    const say = (el, st, text) => { $(el).innerHTML = text ? `<div class="msg ${st}">${text}</div>` : ""; };
+
+    function measure() {
+      const ton = parseNum($("jr-ton").value), items = [];
+      REAGENTS.forEach((r, i) => {
+        const c = parseNum($(`jr-c-${i}`).value), ml = parseNum($(`jr-ml-${i}`).value), s = parseNum($(`jr-s-${i}`).value);
+        const ok = c > 0 && ml > 0 && s > 0 && ton > 0;
+        const dose = ok ? doseGt(ml, s, c, ton) : NaN;
+        $(`jr-d-${i}`).textContent = ok ? fmt(dose, 2) : "–";
+        if (ok) items.push({name: r[0], conc: c, ml, s, dose});
+      });
+      return {ton, items};
+    }
+    function keep() {
+      D.ton = $("jr-ton").value; D.note = $("jr-note").value;
+      ["feed", "tail", "fconc"].forEach(k => { D[k] = $("jr-" + k).value; });
+      REAGENTS.forEach((r, i) => { D.r[i] = {c: $(`jr-c-${i}`).value, ml: $(`jr-ml-${i}`).value, s: $(`jr-s-${i}`).value}; });
+      persist();
+    }
+    root.querySelector(".box").addEventListener("input", () => { keep(); measure(); });
+    measure();
+
+    $("jr-save").addEventListener("click", () => {
+      const m = measure();
+      if (!(m.ton > 0)) return say("jr-msg", "bad", `<b>${tr(UI.bad)}</b>${tr(LG.needTon)}`);
+      if (!m.items.length) return say("jr-msg", "bad", `<b>${tr(UI.bad)}</b>${tr(LG.needOne)}`);
+      saved._log.push({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        date: $("jr-date").value || today(), time: $("jr-time").value || nowTime(),
+        ton: m.ton, items: m.items, note: $("jr-note").value.trim(),
+        feed: $("jr-feed").value.trim(), tail: $("jr-tail").value.trim(), fconc: $("jr-fconc").value.trim()
+      });
+      ["feed", "tail", "fconc", "note"].forEach(k => { $("jr-" + k).value = ""; });
+      $("jr-time").value = nowTime();
+      keep();
+      say("jr-msg", "good", `<b>${tr(UI.good)}</b>${tr(LG.saved)}`);
+      list();
+    });
+
+    function list() {
+      const log = saved._log.slice().sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+      $("jr-count").textContent = `${log.length} ${tr(LG.count)}`;
+      const box = $("jr-list");
+      if (!log.length) { box.innerHTML = `<p class="note">${tr(LG.empty)}</p>`; return; }
+      box.innerHTML = log.map(e => `<div class="entry" data-id="${esc(e.id)}">
+        <div class="entry-head">
+          <span class="when">${esc(e.date)} · ${esc(e.time)}</span>
+          <span class="ton">${fmt(e.ton, 0)} ${tr(U.tph)}</span>
+          <button type="button" class="btn small danger" data-del="${esc(e.id)}">${tr(LG.del)}</button>
+        </div>
+        <div class="chips">${e.items.map(i => `<span class="chip"><b>${esc(i.name)}</b> ${fmt(i.dose, 2)} ${tr(U.gpt)}<small>${fmt(i.ml, 0)} ml / ${fmt(i.s, 1)} s · ${fmt(i.conc, 0)} %</small></span>`).join("")}</div>
+        <div class="fields g3">${resultFields("jr-e-" + e.id, e)}</div>
+        ${e.note ? `<p class="note">${esc(e.note)}</p>` : ""}
+      </div>`).join("");
+    }
+    $("jr-list").addEventListener("input", ev => {
+      const card = ev.target.closest(".entry"), k = ev.target.dataset.k;
+      const e = card && saved._log.find(x => x.id === card.dataset.id);
+      if (e && k) { e[k] = ev.target.value.trim(); persist(); }
+    });
+    $("jr-list").addEventListener("click", ev => {
+      const b = ev.target.closest("[data-del]"); if (!b) return;
+      if (b.dataset.armed) { saved._log = saved._log.filter(x => x.id !== b.dataset.del); persist(); list(); }
+      else { b.dataset.armed = "1"; b.textContent = tr(LG.delSure); }
+    });
+    list();
+
+    $("jr-copy").addEventListener("click", () => {
+      if (!saved._log.length) return say("jr-logmsg", "warn", tr(LG.nothing));
+      const text = reportRows(saved._log).map(r => r.map(c => String(c).replace(/[\t\n]/g, " ")).join("\t")).join("\n");
+      const manual = () => {
+        $("jr-logmsg").innerHTML = `<div class="msg warn">${tr(LG.copyManual)}</div><textarea class="rep" id="jr-rep" readonly></textarea>`;
+        $("jr-rep").value = text; $("jr-rep").select();
+      };
+      try { navigator.clipboard.writeText(text).then(() => say("jr-logmsg", "good", tr(LG.copied)), manual); } catch (e) { manual(); }
+    });
+
+    $("jr-xlsx").addEventListener("click", () => {
+      if (!saved._log.length) return say("jr-logmsg", "warn", tr(LG.nothing));
+      const rows = reportRows(saved._log), name = `${tr(LG.file)}-${today()}`;
+      const viaLink = (blob, fname) => {
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      };
+      loadXlsx().then(() => {
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws["!cols"] = rows[0].map((h, i) => ({wch: Math.max(10, String(h).length + 2, i === rows[0].length - 1 ? 30 : 0)}));
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, tr(LG.sheet));
+        const out = XLSX.write(wb, {bookType: "xlsx", type: "array"});
+        viaLink(new Blob([out], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}), name + ".xlsx");
+      }).catch(() => {
+        const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+        viaLink(new Blob(["﻿" + csv], {type: "text/csv;charset=utf-8"}), name + ".csv");
+      }).then(() => say("jr-logmsg", "good", tr(LG.downloaded)));
+    });
+
+    $("jr-clear").addEventListener("click", () => {
+      if (!saved._log.length) return say("jr-logmsg", "warn", tr(LG.nothing));
+      $("jr-logmsg").innerHTML = `<div class="msg bad">${tr(LG.sure)}
+        <div class="btnrow" style="margin-top:8px"><button type="button" class="btn danger" id="jr-yes">${tr(LG.yes)}</button><button type="button" class="btn" id="jr-no">${tr(LG.no)}</button></div></div>`;
+      $("jr-no").addEventListener("click", () => say("jr-logmsg", "", ""));
+      $("jr-yes").addEventListener("click", () => { saved._log = []; persist(); list(); say("jr-logmsg", "good", tr(LG.cleared)); });
+    });
+  }
+
   function build() {
     document.documentElement.lang = LANG ? "en" : "az";
     document.getElementById("h1").textContent = tr(UI.h1);
@@ -637,6 +897,15 @@ if (typeof document !== "undefined") {
       const sec = document.createElement("section");
       sec.className = "panel"; sec.id = "panel-" + m.id; sec.hidden = true;
       sec.setAttribute("role", "tabpanel"); sec.setAttribute("aria-labelledby", "tab-" + m.id);
+      if (m.custom) {
+        sec.innerHTML = `
+          <div class="panel-head"><div><h2>${tr(m.title)}</h2><p>${tr(m.intro)}</p></div></div>
+          <div class="panel" id="${m.id}-body"></div>
+          <div class="box formulas"><h3>${tr(UI.formulas)}</h3><ul>${m.formulas.map(f => `<li>${tr(f)}</li>`).join("")}</ul></div>`;
+        panels.appendChild(sec);
+        renderLog(document.getElementById(m.id + "-body"));
+        return;
+      }
       sec.innerHTML = `
         <div class="panel-head">
           <div><h2>${tr(m.title)}</h2><p>${tr(m.intro)}</p></div>
@@ -697,7 +966,8 @@ if (typeof document !== "undefined") {
 
   function show(id, setHash) {
     if (!MODS.some(m => m.id === id)) id = MODS[0].id;
-    current = id;
+    current = id; saved._tab = id; persist();
+    if (id === "jurnal") loadXlsx().catch(() => {});
     MODS.forEach(m => {
       document.getElementById("panel-" + m.id).hidden = m.id !== id;
       document.getElementById("tab-" + m.id).setAttribute("aria-selected", String(m.id === id));
@@ -709,7 +979,7 @@ if (typeof document !== "undefined") {
   document.getElementById("lang-az").addEventListener("click", () => setLang(0));
   document.getElementById("lang-en").addEventListener("click", () => setLang(1));
   window.addEventListener("hashchange", () => show(location.hash.slice(1), false));
-  current = location.hash.slice(1) || current;
+  current = location.hash.slice(1) || saved._tab || current;
   build();
 }
 </script>
