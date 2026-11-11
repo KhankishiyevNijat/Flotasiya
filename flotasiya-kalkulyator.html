@@ -726,7 +726,9 @@ function migrateLog(log) {
   const out = [];
   (Array.isArray(log) ? log : []).forEach(e => {
     if (!e || typeof e !== "object") return;
-    if (e.type === "set" || e.type === "res") { out.push(e); return; }
+    // A setting with no reagent lines is a leftover of a pH reading that an earlier version mangled on reload.
+    if (e.type === "set" && !(e.items || []).length) return;
+    if (e.type === "set" || e.type === "res" || e.type === "ph") { out.push(e); return; }
     out.push({id: e.id, type: "set", date: e.date, time: e.time, ton: e.ton, note: e.note || "", items: (e.items || []).map(i => ({point: "", ...i}))});
     if (e.feed || e.tail || e.fconc) out.push({id: e.id + "r", type: "res", date: e.date, time: e.time, feed: e.feed || "", tail: e.tail || "", fconc: e.fconc || ""});
   });
@@ -913,7 +915,7 @@ if (typeof document !== "undefined") {
       }
       const rows = await rpc("shift_pull", {p_code: code}) || [];
       const d2 = new Set(saved._dirty || []), g2 = new Set(saved._gone || []);
-      const remote = rows.map(r => r.data).filter(e => e && e.id && !g2.has(e.id));
+      const remote = migrateLog(rows.map(r => r.data)).filter(e => e.id && !g2.has(e.id));
       const ids = new Set(remote.map(e => e.id));
       saved._log = [...remote, ...saved._log.filter(e => d2.has(e.id) && !ids.has(e.id))];
       saved._syncAt = Date.now(); persist();
