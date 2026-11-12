@@ -712,6 +712,8 @@ const LG = {
   recEmpty: ["Recovery-ni görmək üçün feed və rougher tail Cu nəticəsini jurnala yazın.", "Save a feed and rougher tail Cu result to the log to see the recovery."],
   recPrev: ["Əvvəlki nəticə", "Previous result"],
   recBad: ["Tail Cu feed Cu-dan böyük və ya ona bərabərdir. Analizləri yoxlayın.", "Tail Cu is equal to or higher than feed Cu. Check the assays."],
+  edit: ["Düzəlt", "Edit"], saveEdit: ["Dəyişikliyi saxla", "Save changes"], cancel: ["Ləğv et", "Cancel"],
+  savedEdit: ["Dəyişiklik yadda saxlandı.", "Changes saved."], edited: ["düzəldilib", "edited"],
   cloud: ["Ortaq jurnal", "Shared log"],
   cloudHint: ["Ortaq kodu yazıb qoşulun. Eyni kodu yazan bütün cihazlar eyni jurnalı görür.", "Enter the shared code to connect. Every device using the same code sees the same log."],
   cloudCode: ["Ortaq kod", "Shared code"], cloudJoin: ["Qoşul", "Connect"], cloudLeave: ["Ayır", "Disconnect"], cloudNow: ["İndi yenilə", "Refresh now"],
@@ -884,7 +886,7 @@ if (typeof document !== "undefined") {
   // Shared online log. The key below is the public (publishable) one; access is gated by the shared code.
   const CLOUD = {url: "https://hjdavobmepmdiraidgut.supabase.co", key: "sb_publishable_qDU0NEUVepZ3n3gpWPxVKA_Sp7ghSBe"};
   const cloudOn = () => !!(CLOUD.url && CLOUD.key);
-  let lastRec = null;
+  let lastRec = null, setEdit = null, draftBackup = null, rowEdit = null;
   let cloudState = "idle", onCloudChange = null, drawCloud = null, syncing = null, syncAgain = false;
   async function rpc(fn, body) {
     const h = {"Content-Type": "application/json", apikey: CLOUD.key};
@@ -916,8 +918,7 @@ if (typeof document !== "undefined") {
       const rows = await rpc("shift_pull", {p_code: code}) || [];
       const d2 = new Set(saved._dirty || []), g2 = new Set(saved._gone || []);
       const remote = migrateLog(rows.map(r => r.data)).filter(e => e.id && !g2.has(e.id));
-      const ids = new Set(remote.map(e => e.id));
-      saved._log = [...remote, ...saved._log.filter(e => d2.has(e.id) && !ids.has(e.id))];
+      saved._log = [...remote.filter(e => !d2.has(e.id)), ...saved._log.filter(e => d2.has(e.id))];
       saved._syncAt = Date.now(); persist();
       setCloud("ok"); if (onCloudChange) onCloudChange();
     } catch (e) {
@@ -947,7 +948,7 @@ if (typeof document !== "undefined") {
       if (!D.lines.length) D.lines.push({n: "SIPX", p: POINTS[0], c: "14", ml: "100", s: "30"});
       delete D.r;
     }
-    const opts = (list, sel) => list.map(v => `<option${v === sel ? " selected" : ""}>${esc(v)}</option>`).join("");
+    const opts = (all, sel) => (all.includes(sel) ? all : [sel, ...all]).map(v => `<option${v === sel ? " selected" : ""}>${esc(v)}</option>`).join("");
     const names = REAGENTS.map(r => r[0]);
     const num = (id, label, val, f) => `<label>${label}<input class="plain" id="${id}" data-f="${f}" type="text" inputmode="decimal" autocomplete="off" value="${esc(val ?? "")}"></label>`;
     const resFields = list => list.map(([k, l, u]) => `<div class="field">
@@ -969,12 +970,13 @@ if (typeof document !== "undefined") {
           <div class="field"><label for="jr-time">${tr(LG.time)}</label><input class="plain" id="jr-time" type="time" value="${nowTime()}"></div>
           <div class="field"><label for="jr-ton">${tr(LG.ton)}, ${tr(U.tph)}</label><input class="plain" id="jr-ton" type="text" inputmode="decimal" autocomplete="off" value="${esc(D.ton ?? "")}"></div>
         </div>
+        <div id="jr-editbar" aria-live="polite"></div>
         <div class="stack" id="jr-lines" style="gap:8px"></div>
         <div class="btnrow"><button type="button" class="btn" id="jr-add">${tr(LG.addLine)}</button></div>
         <div class="chips" id="jr-tot"></div>
         <p class="hint">${tr(LG.hintRow)}</p>
         <div class="field"><label for="jr-note">${tr(LG.note)}</label><input class="plain" id="jr-note" type="text" autocomplete="off" value="${esc(D.note ?? "")}"></div>
-        <div class="btnrow"><button type="button" class="btn primary" id="jr-save">${tr(LG.saveSet)}</button></div>
+        <div class="btnrow"><button type="button" class="btn primary" id="jr-save">${tr(LG.saveSet)}</button><button type="button" class="btn" id="jr-cancel" hidden>${tr(LG.cancel)}</button></div>
         <div id="jr-msg" aria-live="polite"></div>
       </div>
       <div class="box stack" id="jr-resbox">
@@ -1096,10 +1098,50 @@ if (typeof document !== "undefined") {
     }
 
     const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    // Editing a saved setting loads it into the form above; the draft is put back afterwards.
+    function drawEditBar() {
+      const e = setEdit && saved._log.find(x => x.id === setEdit);
+      if (setEdit && !e) { setEdit = null; }
+      $("jr-editbar").innerHTML = e ? `<div class="msg warn">${LANG ? `Editing the setting of ${esc(stamp(e))}. Change it and press “${tr(LG.saveEdit)}”.` : `${esc(stamp(e))} ayarı düzəldilir. Dəyişib «${tr(LG.saveEdit)}» basın.`}</div>` : "";
+      $("jr-save").textContent = tr(e ? LG.saveEdit : LG.saveSet);
+      $("jr-cancel").hidden = !e;
+    }
+    function fillSetForm(date, time) {
+      $("jr-ton").value = D.ton ?? ""; $("jr-note").value = D.note ?? ""; $("jr-date").value = date; $("jr-time").value = time;
+      persist(); drawLines(); drawEditBar();
+    }
+    function startSetEdit(e) {
+      if (!setEdit) draftBackup = JSON.stringify({ton: D.ton, note: D.note, lines: D.lines});
+      setEdit = e.id;
+      D.ton = String(e.ton); D.note = e.note || "";
+      D.lines = e.items.map(i => ({n: i.name, p: i.point || "", c: String(i.conc), ml: String(i.ml), s: String(i.s)}));
+      fillSetForm(e.date, e.time);
+      say("jr-msg", "", "");
+      $("jr-setbox").scrollIntoView({behavior: "smooth", block: "start"});
+    }
+    function endSetEdit() {
+      try { const b = JSON.parse(draftBackup); D.ton = b.ton; D.note = b.note; D.lines = b.lines; } catch (e) {}
+      setEdit = null; draftBackup = null;
+      fillSetForm(today(), nowTime());
+    }
+    const nowStamp = () => `${today()} ${nowTime()}`;
+    drawEditBar();
+    $("jr-cancel").addEventListener("click", () => { endSetEdit(); say("jr-msg", "", ""); });
+
     $("jr-save").addEventListener("click", () => {
       const m = measure();
       if (!(m.ton > 0)) return say("jr-msg", "bad", tr(LG.needTon));
       if (!m.items.length) return say("jr-msg", "bad", tr(LG.needOne));
+      if (setEdit) {
+        const e = saved._log.find(x => x.id === setEdit);
+        if (e) {
+          e.date = $("jr-date").value || e.date; e.time = $("jr-time").value || e.time;
+          e.ton = m.ton; e.items = m.items; e.note = $("jr-note").value.trim(); e.edited = nowStamp();
+          markDirty(e.id);
+        }
+        endSetEdit(); say("jr-msg", "good", tr(LG.savedEdit)); list(); sync();
+        return;
+      }
       const e = {id: newId(), type: "set", date: $("jr-date").value || today(), time: $("jr-time").value || nowTime(), ton: m.ton, items: m.items, note: $("jr-note").value.trim()};
       saved._log.push(e); markDirty(e.id); sync();
       $("jr-note").value = ""; $("jr-time").value = nowTime();
@@ -1123,11 +1165,26 @@ if (typeof document !== "undefined") {
     $("jr-rsave").addEventListener("click", () => saveResult("res", CU_KEYS, "jr-rdate", "jr-rtime", "jr-rmsg", LG.needRes, LG.savedRes, LG.savedResNone));
     $("jr-psave").addEventListener("click", () => saveResult("ph", PH_KEYS, "jr-pdate", "jr-ptime", "jr-pmsg", LG.needPh, LG.savedPh, LG.savedPhNone));
 
-    const delBtn = id => `<button type="button" class="btn small danger" data-del="${esc(id)}">${tr(LG.del)}</button>`;
-    const resRow = (r, base) => `<div class="resrow">
+    const delBtn = id => `<button type="button" class="btn small" data-edit="${esc(id)}">${tr(LG.edit)}</button><button type="button" class="btn small danger" data-del="${esc(id)}">${tr(LG.del)}</button>`;
+    const editedTag = e => e.edited ? `<span class="note" title="${esc(e.edited)}">${tr(LG.edited)}</span>` : "";
+    const edLabels = {feed: LG.feed, tail: LG.tail, fconc: LG.fconc, ph: LG.ph, sol: LG.sol};
+    const edRow = r => {
+      const keys = r.type === "ph" ? PH_KEYS : (r.ph || r.sol ? RES_KEYS : CU_KEYS);
+      return `<div class="resrow" style="display:block"><div class="stack" style="gap:10px">
+        <div class="fields g3 dt2">
+          <div class="field"><label for="jr-ed-date">${tr(LG.date)}</label><input class="plain" id="jr-ed-date" type="date" value="${esc(r.date)}"></div>
+          <div class="field"><label for="jr-ed-time">${tr(LG.time)}</label><input class="plain" id="jr-ed-time" type="time" value="${esc(r.time)}"></div>
+        </div>
+        <div class="fields g3">${keys.map(k => `<div class="field"><label for="jr-ed-${k}">${tr(edLabels[k])}</label>
+          <div class="ctl"><input id="jr-ed-${k}" data-edk="${k}" type="text" inputmode="decimal" autocomplete="off" value="${esc(r[k] ?? "")}"><span class="unit">${k === "ph" ? "pH" : "%"}</span></div></div>`).join("")}</div>
+        <div class="btnrow"><button type="button" class="btn small primary" data-edsave="${esc(r.id)}">${tr(LG.saveEdit)}</button><button type="button" class="btn small" data-edcancel="1">${tr(LG.cancel)}</button></div>
+        <div id="jr-ed-msg" aria-live="polite"></div>
+      </div></div>`;
+    };
+    const resRow = (r, base) => r.id === rowEdit ? edRow(r) : `<div class="resrow">
         <span class="t">${esc(r.date === base ? r.time : stamp(r))}</span>
         ${r.feed || r.tail || r.fconc ? `<span>${tr(LG.sFeed)} <b>${esc(r.feed || "–")}</b> %</span><span>${tr(LG.sTail)} <b>${esc(r.tail || "–")}</b> %</span><span>${tr(LG.sConc)} <b>${esc(r.fconc || "–")}</b> %</span>` : ""}${r.ph ? `<span>${tr(LG.sPh)} <b>${esc(r.ph)}</b></span>` : ""}${r.sol ? `<span>${tr(LG.sSol)} <b>${esc(r.sol)}</b> %</span>` : ""}
-        <span class="sp"></span>${delBtn(r.id)}
+        ${editedTag(r)}<span class="sp"></span>${delBtn(r.id)}
       </div>`;
     // Current recovery card: ring fills and the number counts up when the value changes.
     function drawRec() {
@@ -1180,7 +1237,7 @@ if (typeof document !== "undefined") {
       let h = sets.slice().reverse().map(s => {
         const mine = results.filter(x => x.set === s), tot = totals(s.items);
         return `<div class="entry">
-          <div class="entry-head"><span class="when">${esc(s.date)} · ${esc(s.time)}</span><span class="ton">${fmt(s.ton, 0)} ${tr(U.tph)}</span>${delBtn(s.id)}</div>
+          <div class="entry-head"><span class="when">${esc(s.date)} · ${esc(s.time)}</span><span class="ton">${fmt(s.ton, 0)} ${tr(U.tph)}</span>${editedTag(s)}<span class="btnrow" style="gap:6px">${delBtn(s.id)}</span></div>
           <div class="chips">${s.items.map(i => `<span class="chip"><b>${esc(i.name)}</b>${i.point ? " → " + esc(i.point) : ""} · ${fmt(i.dose, 2)} ${tr(U.gpt)}<small>${fmt(i.ml, 0)} ml / ${fmt(i.s, 1)} s · ${fmt(i.conc, 0)} %</small></span>`).join("")}</div>
           <p class="note">${tr(LG.total)}: ${tot.map(([n, v]) => `${esc(n)} ${fmt(v, 2)} ${tr(U.gpt)}`).join(" · ")}</p>
           ${s.note ? `<p class="note">${esc(s.note)}</p>` : ""}
@@ -1192,12 +1249,31 @@ if (typeof document !== "undefined") {
       box.innerHTML = h;
     }
     $("jr-list").addEventListener("click", ev => {
+      const ed = ev.target.closest("[data-edit]");
+      if (ed) {
+        const e = saved._log.find(x => x.id === ed.dataset.edit); if (!e) return;
+        if (e.type === "set") startSetEdit(e); else { rowEdit = e.id; list(); }
+        return;
+      }
+      if (ev.target.closest("[data-edcancel]")) { rowEdit = null; list(); return; }
+      const sv = ev.target.closest("[data-edsave]");
+      if (sv) {
+        const e = saved._log.find(x => x.id === sv.dataset.edsave); if (!e) { rowEdit = null; list(); return; }
+        const v = {}; $("jr-list").querySelectorAll("[data-edk]").forEach(i => { v[i.dataset.edk] = i.value.trim(); });
+        const inRange = (x, hi) => { const n = parseNum(x); return n >= 0 && n <= hi; };
+        if (!Object.values(v).some(Boolean)) return say("jr-ed-msg", "bad", tr(e.type === "ph" ? LG.needPh : LG.needRes));
+        if (v.ph && !inRange(v.ph, 14)) return say("jr-ed-msg", "bad", tr(LG.badPh));
+        if (v.sol && !inRange(v.sol, 40)) return say("jr-ed-msg", "bad", tr(LG.badSol));
+        Object.assign(e, v, {date: $("jr-ed-date").value || e.date, time: $("jr-ed-time").value || e.time, edited: nowStamp()});
+        markDirty(e.id); persist(); rowEdit = null; list(); sync();
+        return;
+      }
       const b = ev.target.closest("[data-del]"); if (!b) return;
       if (b.dataset.armed) { saved._log = saved._log.filter(x => x.id !== b.dataset.del); markGone([b.dataset.del]); persist(); list(); sync(); }
       else { b.dataset.armed = "1"; b.textContent = tr(LG.delSure); }
     });
     list();
-    onCloudChange = list;
+    onCloudChange = () => { if (rowEdit && $("jr-ed-date")) drawRec(); else list(); };
     sync();
 
     $("jr-copy").addEventListener("click", () => {
