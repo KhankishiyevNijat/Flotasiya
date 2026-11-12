@@ -205,6 +205,12 @@ select.plain { padding: 8px 6px; }
 .tip .k { width: 12px; height: 2px; background: var(--viz); align-self: center; flex: 0 0 auto; }
 .tip .tl { color: var(--muted); }
 details summary { cursor: pointer; font-weight: 500; font-size: 14px; }
+textarea.plain { font-family: var(--font-body); resize: vertical; }
+.rank { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.rk { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 600; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.rk-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; }
+.rk-val { text-align: right; display: flex; flex-direction: column; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.entry.best { border-color: var(--accent); }
 .hint { color: var(--muted); font-size: 12.5px; margin: 0; }
 .entry { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .entry-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; }
@@ -711,6 +717,17 @@ const MODS = [
     ["Recovery = (Feed Cu − Tail Cu) / Feed Cu × 100", "Recovery = (Feed Cu − Tail Cu) / Feed Cu × 100"],
     ["X oxu vaxt deyilsə, hər nöqtədə X və Y həmin ana qədər yazılmış son dəyərlərdir. r Pearson korrelyasiya əmsalıdır; əlaqəni göstərir, səbəbi yox.", "When the X axis is not time, X and Y at each point are the latest values recorded up to that moment. r is the Pearson correlation coefficient; it shows association, not cause."]
   ]
+},
+{
+  id: "resept", name: ["Reseptlər", "Recipes"], title: ["Reseptlər və blok / sektor arxivi", "Recipes and block / sector archive"], custom: true,
+  intro: ["İşləyən ayarı ada ilə saxlayın, bir toxunuşla formaya yükləyin. Tətbiq hər resept altında yazılmış nəticələri izləyir və ən yaxşı ayarları sıralayır. Blok və sektoru yazsanız, eyni sektordan filiz gələndə nə ilə işlədiyinizi arxivdən görə bilərsiniz.",
+          "Save a working setting under a name and load it into the form with one tap. The app tracks the results recorded under each recipe and ranks the best settings. If you record the block and sector, you can look up in the archive what you ran when ore from the same sector comes again."],
+  inputs: [],
+  formulas: [
+    ["Resept reytinqi: həmin reseptlə yazılmış ayarların altındakı bütün nəticələrin orta recovery-si, Recovery = (Feed Cu − Tail Cu) / Feed Cu × 100. Reytinqə düşmək üçün ən azı 2 nəticə lazımdır.", "Recipe ranking: the average recovery of all results under settings saved with that recipe, Recovery = (Feed Cu − Tail Cu) / Feed Cu × 100. At least 2 results are needed to enter the ranking."],
+    ["Nəticə həmin vaxtda qüvvədə olan ayara bağlanır. Dəyişiklikdən sonrakı ilk nəticə əvvəlki ayarın təsirini daşıya bilər, ona görə az nəticəli reytinqə ehtiyatla baxın.", "A result is linked to the setting in force at its time. The first result after a change may still carry the effect of the previous setting, so treat rankings with few results with care."],
+    ["Resept həmin tonnajda ölçülmüş qab və vaxt dəyərlərini saxlayır. Tonnaj dəyişsə, eyni nasos ayarı başqa q/t verir.", "A recipe stores the cup and time values measured at its tonnage. If the tonnage changes, the same pump setting gives a different g/t."]
+  ]
 }
 ];
 
@@ -753,7 +770,7 @@ const LG = {
   pdfFail: ["PDF yaradıla bilmədi. Bu, yalnız quraşdırılmış tətbiqdə (GitHub Pages ünvanında) işləyir. Burada «Hesabatı kopyala» düyməsindən istifadə edin.",
             "The PDF could not be created. It only works in the installed app (the GitHub Pages address). Use “Copy report” here."],
   nothing: ["Jurnal boşdur, hesabat üçün qeyd yoxdur.", "The log is empty, there is nothing to report."],
-  sure: ["Bütün qeydlər silinsin? Bu geri qaytarılmır.", "Delete all entries? This cannot be undone."],
+  sure: ["Bütün qeydlər silinsin? Bu geri qaytarılmır. Reseptlər silinmir.", "Delete all entries? This cannot be undone. Recipes are kept."],
   yes: ["Bəli, sil", "Yes, delete"], no: ["Xeyr", "No"], del: ["Sil", "Delete"], delSure: ["Silinsin?", "Delete?"],
   cleared: ["Bütün qeydlər silindi.", "All entries deleted."],
   device: ["Qeydlər yalnız bu cihazda saxlanır. Silməzdən əvvəl hesabatı saxlayın.", "Entries are stored on this device only. Save the report before deleting."],
@@ -770,7 +787,7 @@ const LG = {
   cloudBad: ["Kod səhvdir. Yenidən yazın.", "The code is wrong. Enter it again."],
   cloudBusy: ["Yenilənir…", "Refreshing…"], cloudOk: ["Qoşulub.", "Connected."], cloudAt: ["Son yenilənmə:", "Last refresh:"],
   cloudOff: ["Bağlantı yoxdur. Qeydlər bu cihazda saxlanır və bağlantı gələndə göndəriləcək.", "No connection. Entries are kept on this device and will be sent when the connection returns."],
-  sureCloud: ["Bütün qeydlər bütün cihazlarda silinsin? Bu geri qaytarılmır.", "Delete all entries on every device? This cannot be undone."]
+  sureCloud: ["Bütün qeydlər bütün cihazlarda silinsin? Bu geri qaytarılmır. Reseptlər silinmir.", "Delete all entries on every device? This cannot be undone. Recipes are kept."]
 };
 const stamp = e => `${e.date} ${e.time}`;
 // Older logs kept results inside the reagent entry; split them into separate entries.
@@ -780,7 +797,7 @@ function migrateLog(log) {
     if (!e || typeof e !== "object") return;
     // A setting with no reagent lines is a leftover of a pH reading that an earlier version mangled on reload.
     if (e.type === "set" && !(e.items || []).length) return;
-    if (e.type === "set" || e.type === "res" || e.type === "ph" || e.type === "chart") { out.push(e); return; }
+    if (e.type === "set" || e.type === "res" || e.type === "ph" || e.type === "chart" || e.type === "recipe") { out.push(e); return; }
     out.push({id: e.id, type: "set", date: e.date, time: e.time, ton: e.ton, note: e.note || "", items: (e.items || []).map(i => ({point: "", ...i}))});
     if (e.feed || e.tail || e.fconc) out.push({id: e.id + "r", type: "res", date: e.date, time: e.time, feed: e.feed || "", tail: e.tail || "", fconc: e.fconc || ""});
   });
@@ -810,6 +827,37 @@ function recoveryFrom(log) {
     .sort((a, b) => stamp(a.e).localeCompare(stamp(b.e)))
     .map(x => ({...x, r: (x.feed - x.tail) / x.feed * 100}));
   return {cur: pts[pts.length - 1] || null, prev: pts[pts.length - 2] || null};
+}
+// ---------- Recipes: named settings, linked to the results they produced ----------
+const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+const sectorKey = e => [e.block, e.sector].map(x => (x || "").trim()).filter(Boolean).join(" · ");
+const knownKeys = log => [...new Set(log.filter(e => e.type === "set" || e.type === "recipe").map(sectorKey).filter(Boolean))].sort();
+// For every setting: the recovery values, pH and solids readings that were linked to it by time.
+function setStats(log) {
+  const {sets, results} = splitLog(log), m = new Map();
+  sets.forEach(s => m.set(s.id, {s, rec: [], ph: [], sol: []}));
+  results.forEach(({r, set}) => {
+    const o = set && m.get(set.id); if (!o) return;
+    const f = parseNum(r.feed), t = parseNum(r.tail);
+    if (f > 0 && t >= 0) o.rec.push((f - t) / f * 100);
+    const p = parseNum(r.ph), so = parseNum(r.sol);
+    if (isFinite(p)) o.ph.push(p);
+    if (isFinite(so)) o.sol.push(so);
+  });
+  return m;
+}
+function recipeStats(log) {
+  const st = setStats(log), out = new Map();
+  log.filter(e => e.type === "recipe").forEach(r => {
+    const rec = [], ph = [], sol = []; let uses = 0;
+    st.forEach(o => { if (o.s.recipe === r.id) { uses++; rec.push(...o.rec); ph.push(...o.ph); sol.push(...o.sol); } });
+    out.set(r.id, {r, uses, n: rec.length, rec: avg(rec), ph: avg(ph), sol: avg(sol)});
+  });
+  return out;
+}
+function draftFromRecipe(D, r) {
+  D.ton = String(r.ton ?? D.ton ?? ""); D.block = r.block || ""; D.sector = r.sector || ""; D.recipe = r.id;
+  D.lines = (r.items || []).map(i => ({n: i.name, p: i.point || "", c: String(i.conc), ml: String(i.ml), s: String(i.s)}));
 }
 const REPORT_TITLE = "Shift report for reagent dosage";
 const SET_HEAD = ["Date / time", "Tonnage, t/h", "Reagent", "Point", "Strength, %", "Cup, mL", "Fill time, s", "Dose, g/t"];
@@ -1119,7 +1167,7 @@ if (typeof document !== "undefined") {
   // Shared online log. The key below is the public (publishable) one; access is gated by the shared code.
   const CLOUD = {url: "https://hjdavobmepmdiraidgut.supabase.co", key: "sb_publishable_qDU0NEUVepZ3n3gpWPxVKA_Sp7ghSBe"};
   const cloudOn = () => !!(CLOUD.url && CLOUD.key);
-  let lastRec = null, setEdit = null, draftBackup = null, rowEdit = null;
+  let lastRec = null, setEdit = null, draftBackup = null, rowEdit = null, flashMsg = null, refreshJr = null;
   let cloudState = "idle", onCloudChange = null, drawCloud = null, syncing = null, syncAgain = false;
   async function rpc(fn, body) {
     const h = {"Content-Type": "application/json", apikey: CLOUD.key};
@@ -1155,6 +1203,7 @@ if (typeof document !== "undefined") {
       saved._syncAt = Date.now(); persist();
       setCloud("ok"); if (onCloudChange) onCloudChange();
       if (redrawCharts && current === "qrafik") redrawCharts();
+      if (redrawRecipes && current === "resept") redrawRecipes(false);
     } catch (e) {
       if (e.badCode) { saved._code = ""; persist(); }
       setCloud(e.badCode ? "code" : "off");
@@ -1209,6 +1258,12 @@ if (typeof document !== "undefined") {
         <div class="btnrow"><button type="button" class="btn" id="jr-add">${tr(LG.addLine)}</button></div>
         <div class="chips" id="jr-tot"></div>
         <p class="hint">${tr(LG.hintRow)}</p>
+        <div class="fields g3 dt2">
+          <div class="field"><label for="jr-block">${tr(LR.block)}</label><input class="plain" id="jr-block" list="jr-blocks" type="text" autocomplete="off" value="${esc(D.block ?? "")}"></div>
+          <div class="field"><label for="jr-sector">${tr(LR.sector)}</label><input class="plain" id="jr-sector" list="jr-sectors" type="text" autocomplete="off" value="${esc(D.sector ?? "")}"></div>
+        </div>
+        <datalist id="jr-blocks"></datalist><datalist id="jr-sectors"></datalist>
+        <div class="field"><label for="jr-recipe">${tr(LR.recipeSel)}</label><select class="plain" id="jr-recipe"></select></div>
         <div class="field"><label for="jr-note">${tr(LG.note)}</label><input class="plain" id="jr-note" type="text" autocomplete="off" value="${esc(D.note ?? "")}"></div>
         <div class="btnrow"><button type="button" class="btn primary" id="jr-save">${tr(LG.saveSet)}</button><button type="button" class="btn" id="jr-cancel" hidden>${tr(LG.cancel)}</button></div>
         <div id="jr-msg" aria-live="polite"></div>
@@ -1272,6 +1327,7 @@ if (typeof document !== "undefined") {
     }
     function keep() {
       D.ton = $("jr-ton").value; D.note = $("jr-note").value;
+      D.block = $("jr-block").value; D.sector = $("jr-sector").value; D.recipe = $("jr-recipe").value;
       D.res = {}; RES_KEYS.forEach(k => { D.res[k] = $("jr-" + k).value; });
       persist();
     }
@@ -1331,6 +1387,26 @@ if (typeof document !== "undefined") {
       drawCloud();
     }
 
+    const recipeName = id => { const r = saved._log.find(x => x.type === "recipe" && x.id === id); return r ? r.name : ""; };
+    function fillRecipeOpts() {
+      const rs = saved._log.filter(e => e.type === "recipe").sort((a, b) => a.name.localeCompare(b.name)), cur = D.recipe || "";
+      $("jr-recipe").innerHTML = `<option value="">–</option>` + rs.map(r => `<option value="${esc(r.id)}"${r.id === cur ? " selected" : ""}>${esc(r.name)}${sectorKey(r) ? " · " + esc(sectorKey(r)) : ""}</option>`).join("");
+      if (cur && !rs.some(r => r.id === cur)) { D.recipe = ""; persist(); }
+      const uniq = f => [...new Set(saved._log.filter(e => e.type === "set" || e.type === "recipe").map(e => (e[f] || "").trim()).filter(Boolean))].sort();
+      $("jr-blocks").innerHTML = uniq("block").map(v => `<option value="${esc(v)}">`).join("");
+      $("jr-sectors").innerHTML = uniq("sector").map(v => `<option value="${esc(v)}">`).join("");
+    }
+    refreshJr = fillRecipeOpts; fillRecipeOpts();
+    ["jr-block", "jr-sector"].forEach(id => $(id).addEventListener("input", keep));
+    $("jr-recipe").addEventListener("change", () => {
+      const r = saved._log.find(x => x.type === "recipe" && x.id === $("jr-recipe").value);
+      if (r && !setEdit) {
+        draftFromRecipe(D, r);
+        $("jr-ton").value = D.ton; $("jr-block").value = D.block; $("jr-sector").value = D.sector;
+        persist(); drawLines(); say("jr-msg", "good", tr(LR.loaded));
+      } else keep();
+    });
+    if (flashMsg) { say("jr-msg", "good", tr(flashMsg)); flashMsg = null; setTimeout(() => $("jr-setbox").scrollIntoView({behavior: "smooth", block: "start"}), 50); }
     const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     // Editing a saved setting loads it into the form above; the draft is put back afterwards.
     function drawEditBar() {
@@ -1342,19 +1418,20 @@ if (typeof document !== "undefined") {
     }
     function fillSetForm(date, time) {
       $("jr-ton").value = D.ton ?? ""; $("jr-note").value = D.note ?? ""; $("jr-date").value = date; $("jr-time").value = time;
-      persist(); drawLines(); drawEditBar();
+      $("jr-block").value = D.block ?? ""; $("jr-sector").value = D.sector ?? "";
+      persist(); drawLines(); drawEditBar(); fillRecipeOpts();
     }
     function startSetEdit(e) {
-      if (!setEdit) draftBackup = JSON.stringify({ton: D.ton, note: D.note, lines: D.lines});
+      if (!setEdit) draftBackup = JSON.stringify({ton: D.ton, note: D.note, lines: D.lines, block: D.block, sector: D.sector, recipe: D.recipe});
       setEdit = e.id;
-      D.ton = String(e.ton); D.note = e.note || "";
+      D.ton = String(e.ton); D.note = e.note || ""; D.block = e.block || ""; D.sector = e.sector || ""; D.recipe = e.recipe || "";
       D.lines = e.items.map(i => ({n: i.name, p: i.point || "", c: String(i.conc), ml: String(i.ml), s: String(i.s)}));
       fillSetForm(e.date, e.time);
       say("jr-msg", "", "");
       $("jr-setbox").scrollIntoView({behavior: "smooth", block: "start"});
     }
     function endSetEdit() {
-      try { const b = JSON.parse(draftBackup); D.ton = b.ton; D.note = b.note; D.lines = b.lines; } catch (e) {}
+      try { const b = JSON.parse(draftBackup); D.ton = b.ton; D.note = b.note; D.lines = b.lines; D.block = b.block; D.sector = b.sector; D.recipe = b.recipe; } catch (e) {}
       setEdit = null; draftBackup = null;
       fillSetForm(today(), nowTime());
     }
@@ -1371,13 +1448,15 @@ if (typeof document !== "undefined") {
         if (e) {
           e.date = $("jr-date").value || e.date; e.time = $("jr-time").value || e.time;
           e.ton = m.ton; e.items = m.items; e.note = $("jr-note").value.trim(); e.edited = nowStamp();
+          e.block = $("jr-block").value.trim(); e.sector = $("jr-sector").value.trim(); e.recipe = $("jr-recipe").value || "";
           markDirty(e.id);
         }
         endSetEdit(); say("jr-msg", "good", tr(LG.savedEdit)); list(); sync();
         return;
       }
-      const e = {id: newId(), type: "set", date: $("jr-date").value || today(), time: $("jr-time").value || nowTime(), ton: m.ton, items: m.items, note: $("jr-note").value.trim()};
-      saved._log.push(e); markDirty(e.id); sync();
+      const e = {id: newId(), type: "set", date: $("jr-date").value || today(), time: $("jr-time").value || nowTime(), ton: m.ton, items: m.items, note: $("jr-note").value.trim(),
+        block: $("jr-block").value.trim(), sector: $("jr-sector").value.trim(), recipe: $("jr-recipe").value || ""};
+      saved._log.push(e); markDirty(e.id); sync(); fillRecipeOpts();
       $("jr-note").value = ""; $("jr-time").value = nowTime();
       keep(); say("jr-msg", "good", tr(LG.savedSet)); list();
     });
@@ -1474,6 +1553,7 @@ if (typeof document !== "undefined") {
           <div class="entry-head"><span class="when">${esc(s.date)} · ${esc(s.time)}</span><span class="ton">${fmt(s.ton, 0)} ${tr(U.tph)}</span>${editedTag(s)}<span class="btnrow" style="gap:6px">${delBtn(s.id)}</span></div>
           <div class="chips">${s.items.map(i => `<span class="chip"><b>${esc(i.name)}</b>${i.point ? " → " + esc(i.point) : ""} · ${fmt(i.dose, 2)} ${tr(U.gpt)}<small>${fmt(i.ml, 0)} ml / ${fmt(i.s, 1)} s · ${fmt(i.conc, 0)} %</small></span>`).join("")}</div>
           <p class="note">${tr(LG.total)}: ${tot.map(([n, v]) => `${esc(n)} ${fmt(v, 2)} ${tr(U.gpt)}`).join(" · ")}</p>
+          ${sectorKey(s) || recipeName(s.recipe) ? `<div class="chips">${sectorKey(s) ? `<span class="chip">${esc(sectorKey(s))}</span>` : ""}${recipeName(s.recipe) ? `<span class="chip">★ ${esc(recipeName(s.recipe))}</span>` : ""}</div>` : ""}
           ${s.note ? `<p class="note">${esc(s.note)}</p>` : ""}
           <p class="sub">${tr(LG.resOf)}</p>
           ${mine.length ? mine.map(x => resRow(x.r, s.date)).join("") : `<p class="note">${tr(LG.noRes)}</p>`}
@@ -1529,10 +1609,149 @@ if (typeof document !== "undefined") {
       $("jr-logmsg").innerHTML = `<div class="msg bad">${tr(cloudOn() && saved._code ? LG.sureCloud : LG.sure)}
         <div class="btnrow" style="margin-top:8px"><button type="button" class="btn danger" id="jr-yes">${tr(LG.yes)}</button><button type="button" class="btn" id="jr-no">${tr(LG.no)}</button></div></div>`;
       $("jr-no").addEventListener("click", () => say("jr-logmsg", "", ""));
-      $("jr-yes").addEventListener("click", () => { markGone(saved._log.map(e => e.id)); saved._log = []; persist(); list(); sync(); say("jr-logmsg", "good", tr(LG.cleared)); });
+      $("jr-yes").addEventListener("click", () => { markGone(saved._log.filter(e => e.type !== "recipe").map(e => e.id)); saved._log = saved._log.filter(e => e.type === "recipe"); persist(); list(); sync(); say("jr-logmsg", "good", tr(LG.cleared)); });
     });
   }
 
+  // ---------- Recipes tab ----------
+  const LR = {
+    top: ["Ən yaxşı 3 ayar", "Top 3 settings"],
+    topHint: ["Reseptlər, onlarla yazılmış ayarların altındakı nəticələrin orta recovery-sinə görə sıralanır. Ən azı 2 nəticə lazımdır.", "Recipes are ranked by the average recovery of the results under settings saved with them. At least 2 results are needed."],
+    topEmpty: ["Hələ sıralama üçün kifayət qədər məlumat yoxdur. Reseptlə ayar yazın və onun altında ən azı 2 nəticə qeyd edin.", "There is not enough data to rank yet. Save a setting with a recipe and record at least 2 results under it."],
+    newRecipe: ["Yeni resept", "New recipe"], editRecipe: ["Reseptə düzəliş", "Edit recipe"],
+    name: ["Resept adı", "Recipe name"], block: ["Blok", "Block"], sector: ["Sektor", "Sector"], note: ["Qeyd (istəyə görə)", "Note (optional)"],
+    src: ["Reagent sətirləri haradan götürülsün", "Where to take the reagent lines from"],
+    srcForm: ["Jurnal formasındakı cari ayar", "Current setting in the log form"], srcKeep: ["Dəyişmə (hazırkı sətirlər qalsın)", "Keep (leave the current lines)"],
+    srcHint: ["Və ya jurnalda artıq saxladığınız ayarlardan birini seçin.", "Or pick one of the settings you already saved in the log."],
+    save: ["Reseptı saxla", "Save recipe"], cancel: ["Ləğv et", "Cancel"], saved: ["Resept saxlandı.", "Recipe saved."],
+    needName: ["Reseptə ad verin.", "Give the recipe a name."], needLines: ["Reagent sətri tapılmadı. Jurnal formasında qatılığı, qabı və vaxtı doldurun və ya jurnaldan ayar seçin.", "No reagent lines found. Fill in strength, cup and time in the log form, or pick a setting from the log."],
+    needTon: ["Tonnaj tapılmadı. Jurnal formasında tonnajı yazın.", "No tonnage found. Enter the tonnage in the log form."],
+    list: ["Reseptlər", "Recipes"], listEmpty: ["Hələ resept yoxdur. Yuxarıda ad verib saxlayın.", "No recipes yet. Give one a name above and save it."],
+    apply: ["Formaya yüklə", "Load into form"], edit: ["Düzəlt", "Edit"], del: ["Sil", "Delete"], delSure: ["Silinsin?", "Delete?"],
+    loaded: ["Resept formaya yükləndi. Tonnajı və vaxtı yoxlayıb «Ayarı jurnala yaz» basın.", "Recipe loaded into the form. Check the tonnage and time, then press “Save setting to log”."],
+    avgRec: ["Orta recovery", "Average recovery"], resN: ["nəticə", "results"], useN: ["istifadə", "uses"], noRes: ["hələ nəticə yoxdur", "no results yet"],
+    arch: ["Blok / sektor arxivi", "Block / sector archive"], pickKey: ["Blok / sektor", "Block / sector"],
+    archEmpty: ["Hələ blok və ya sektor yazılmış ayar yoxdur. Jurnal formasında «Blok» və «Sektor» xanalarını doldurun.", "No setting has a block or sector yet. Fill in the “Block” and “Sector” fields in the log form."],
+    archNone: ["Bu blok / sektor üçün ayar tapılmadı.", "No settings found for this block / sector."],
+    bestHere: ["Bu sektor üçün ən yaxşı ayar", "Best setting for this sector"], recipesHere: ["Bu sektorun reseptləri", "Recipes for this sector"],
+    ph: ["pH", "pH"], sol: ["bərk faza", "solids"], mark: ["ən yaxşı", "best"],
+    recipeSel: ["Resept (seçsəniz formaya yüklənir)", "Recipe (picking one loads it into the form)"]
+  };
+  let redrawRecipes = null;
+  function renderRecipes(root) {
+    saved._log = migrateLog(saved._log);
+    let editId = null;
+    const $ = id => document.getElementById(id);
+    const say = (el, st, text) => { $(el).innerHTML = text ? `<div class="msg ${st}">${st === "warn" || !UI[st] ? "" : `<b>${tr(UI[st])}</b>`}${text}</div>` : ""; };
+    const nowStamp = () => `${today()} ${nowTime()}`;
+    const num = (v, d) => v == null ? "–" : fmt(v, d);
+    root.innerHTML = `
+      <div class="box stack"><h3 style="margin:0">${tr(LR.top)}</h3><p class="hint">${tr(LR.topHint)}</p><div class="stack" id="rc-top" style="gap:8px"></div></div>
+      <div class="box stack" id="rc-formbox"></div>
+      <div class="box stack"><h3 style="margin:0">${tr(LR.list)}</h3><div class="stack" id="rc-list"></div></div>
+      <div class="box stack"><h3 style="margin:0">${tr(LR.arch)}</h3>
+        <div class="field"><label for="rc-key">${tr(LR.pickKey)}</label><select class="plain" id="rc-key"></select></div>
+        <div class="stack" id="rc-arch"></div></div>`;
+
+    function drawTop() {
+      const rows = [...recipeStats(saved._log).values()].filter(o => o.n >= 2).sort((a, b) => b.rec - a.rec).slice(0, 3);
+      $("rc-top").innerHTML = rows.length ? rows.map((o, i) => `<div class="rank"><span class="rk">${i + 1}</span>
+          <div class="rk-main"><b>${esc(o.r.name)}</b><span class="note">${esc(sectorKey(o.r))}</span></div>
+          <div class="rk-val"><b>${fmt(o.rec, 1)} %</b><span class="note">${o.n} ${tr(LR.resN)} · ${o.uses} ${tr(LR.useN)}</span></div>
+          <button type="button" class="btn small" data-apply="${esc(o.r.id)}">${tr(LR.apply)}</button></div>`).join("")
+        : `<p class="note">${tr(LR.topEmpty)}</p>`;
+    }
+    function drawForm() {
+      const r = editId && saved._log.find(x => x.id === editId), D = saved._draft || {};
+      const sets = saved._log.filter(e => e.type === "set").sort((a, b) => stamp(b).localeCompare(stamp(a)));
+      const src = (r ? `<option value="keep">${tr(LR.srcKeep)}</option>` : "") + `<option value="form">${tr(LR.srcForm)}</option>`
+        + sets.map(s => `<option value="${esc(s.id)}">${esc(stamp(s))} · ${esc([...new Set(s.items.map(i => i.name))].join(", "))}</option>`).join("");
+      $("rc-formbox").innerHTML = `<h3 style="margin:0">${tr(r ? LR.editRecipe : LR.newRecipe)}</h3>
+        <div class="field"><label for="rc-name">${tr(LR.name)}</label><input class="plain" id="rc-name" type="text" autocomplete="off" value="${esc(r ? r.name : "")}"></div>
+        <div class="fields g3 dt2">
+          <div class="field"><label for="rc-block">${tr(LR.block)}</label><input class="plain" id="rc-block" type="text" autocomplete="off" value="${esc(r ? r.block || "" : D.block || "")}"></div>
+          <div class="field"><label for="rc-sector">${tr(LR.sector)}</label><input class="plain" id="rc-sector" type="text" autocomplete="off" value="${esc(r ? r.sector || "" : D.sector || "")}"></div>
+        </div>
+        <div class="field"><label for="rc-note">${tr(LR.note)}</label><textarea class="plain" id="rc-note" rows="3">${esc(r ? r.note || "" : "")}</textarea></div>
+        <div class="field"><label for="rc-src">${tr(LR.src)}</label><select class="plain" id="rc-src">${src}</select><small>${tr(LR.srcHint)}</small></div>
+        <div class="btnrow"><button type="button" class="btn primary" id="rc-save">${tr(LR.save)}</button>${r ? `<button type="button" class="btn" id="rc-cancel">${tr(LR.cancel)}</button>` : ""}</div>
+        <div id="rc-msg" aria-live="polite"></div>`;
+      if (r) $("rc-src").value = "keep";
+    }
+    const lines = (items, ton) => items.map(i => `<span class="chip"><b>${esc(i.name)}</b>${i.point ? " → " + esc(i.point) : ""} · ${fmt(doseGt(i.ml, i.s, i.conc, ton), 2)} ${tr(U.gpt)}<small>${fmt(i.ml, 0)} ml / ${fmt(i.s, 1)} s · ${fmt(i.conc, 0)} %</small></span>`).join("");
+    const statLine = o => `${o.n ? `${tr(LR.avgRec)} <b>${fmt(o.rec, 1)} %</b> · ${o.n} ${tr(LR.resN)}` : tr(LR.noRes)} · ${o.uses} ${tr(LR.useN)}${o.ph != null ? ` · ${tr(LR.ph)} ${fmt(o.ph, 1)}` : ""}${o.sol != null ? ` · ${tr(LR.sol)} ${fmt(o.sol, 1)} %` : ""}`;
+    function drawList() {
+      const rs = [...recipeStats(saved._log).values()].sort((a, b) => a.r.name.localeCompare(b.r.name));
+      $("rc-list").innerHTML = rs.length ? rs.map(o => `<div class="entry">
+          <div class="entry-head"><span class="when">${esc(o.r.name)}</span><span class="btnrow" style="gap:6px">
+            <button type="button" class="btn small primary" data-apply="${esc(o.r.id)}">${tr(LR.apply)}</button>
+            <button type="button" class="btn small" data-redit="${esc(o.r.id)}">${tr(LR.edit)}</button>
+            <button type="button" class="btn small danger" data-rdel="${esc(o.r.id)}">${tr(LR.del)}</button></span></div>
+          ${sectorKey(o.r) ? `<div class="chips"><span class="chip">${esc(sectorKey(o.r))}</span></div>` : ""}
+          <div class="chips">${lines(o.r.items, o.r.ton)}</div>
+          <p class="note">${fmt(o.r.ton, 0)} ${tr(U.tph)} · ${statLine(o)}</p>
+          ${o.r.note ? `<p class="note">${esc(o.r.note)}</p>` : ""}
+        </div>`).join("") : `<p class="note">${tr(LR.listEmpty)}</p>`;
+    }
+    function drawArch() {
+      const keys = knownKeys(saved._log), sel = $("rc-key"), cur = sel.value && keys.includes(sel.value) ? sel.value : keys[0] || "";
+      sel.innerHTML = keys.length ? keys.map(k => `<option${k === cur ? " selected" : ""}>${esc(k)}</option>`).join("") : `<option value="">–</option>`;
+      if (!keys.length) { $("rc-arch").innerHTML = `<p class="note">${tr(LR.archEmpty)}</p>`; return; }
+      const st = setStats(saved._log), rname = id => { const r = saved._log.find(x => x.type === "recipe" && x.id === id); return r ? r.name : ""; };
+      const sets = [...st.values()].filter(o => sectorKey(o.s) === cur).sort((a, b) => stamp(b.s).localeCompare(stamp(a.s)));
+      const rated = sets.filter(o => o.rec.length), best = rated.length ? rated.reduce((a, b) => avg(b.rec) > avg(a.rec) ? b : a) : null;
+      const rcs = saved._log.filter(e => e.type === "recipe" && sectorKey(e) === cur);
+      let h = rcs.length ? `<p class="sub">${tr(LR.recipesHere)}</p><div class="chips">${rcs.map(r => `<button type="button" class="pick" data-apply="${esc(r.id)}">${esc(r.name)}</button>`).join("")}</div>` : "";
+      if (best) h += `<div class="msg good"><b>${tr(LR.bestHere)}:</b> ${esc(stamp(best.s))} · ${fmt(avg(best.rec), 1)} % (${best.rec.length} ${tr(LR.resN)})</div>`;
+      h += sets.length ? sets.map(o => `<div class="entry${o === best ? " best" : ""}">
+          <div class="entry-head"><span class="when">${esc(stamp(o.s))}${o === best ? ` · ★ ${tr(LR.mark)}` : ""}</span><span class="ton">${fmt(o.s.ton, 0)} ${tr(U.tph)}</span></div>
+          <div class="chips">${lines(o.s.items, o.s.ton)}</div>
+          <p class="note">${o.rec.length ? `${tr(LR.avgRec)} <b>${fmt(avg(o.rec), 1)} %</b> · ${o.rec.length} ${tr(LR.resN)}` : tr(LR.noRes)}${o.ph.length ? ` · ${tr(LR.ph)} ${fmt(avg(o.ph), 1)}` : ""}${o.sol.length ? ` · ${tr(LR.sol)} ${fmt(avg(o.sol), 1)} %` : ""}${rname(o.s.recipe) ? ` · ★ ${esc(rname(o.s.recipe))}` : ""}</p>
+          ${o.s.note ? `<p class="note">${esc(o.s.note)}</p>` : ""}</div>`).join("") : `<p class="note">${tr(LR.archNone)}</p>`;
+      $("rc-arch").innerHTML = h;
+    }
+    const all = full => { drawTop(); drawList(); drawArch(); if (full) drawForm(); };
+
+    function applyRecipe(id) {
+      const r = saved._log.find(x => x.type === "recipe" && x.id === id); if (!r) return;
+      if (!saved._draft || typeof saved._draft !== "object") saved._draft = {};
+      draftFromRecipe(saved._draft, r);
+      setEdit = null; draftBackup = null; flashMsg = LR.loaded;
+      persist(); current = "jurnal"; build(); show("jurnal", true);
+    }
+    root.addEventListener("click", ev => {
+      const ap = ev.target.closest("[data-apply]"); if (ap) return applyRecipe(ap.dataset.apply);
+      const ed = ev.target.closest("[data-redit]");
+      if (ed) { editId = ed.dataset.redit; drawForm(); $("rc-formbox").scrollIntoView({behavior: "smooth", block: "start"}); return; }
+      const dl = ev.target.closest("[data-rdel]");
+      if (dl) {
+        if (dl.dataset.armed) { saved._log = saved._log.filter(x => x.id !== dl.dataset.rdel); markGone([dl.dataset.rdel]); persist(); all(true); sync(); }
+        else { dl.dataset.armed = "1"; dl.textContent = tr(LR.delSure); }
+        return;
+      }
+      if (ev.target.id === "rc-cancel") { editId = null; drawForm(); return; }
+      if (ev.target.id !== "rc-save") return;
+      const name = $("rc-name").value.trim(); if (!name) return say("rc-msg", "bad", tr(LR.needName));
+      const srcv = $("rc-src").value, old = editId && saved._log.find(x => x.id === editId);
+      let items = old ? old.items : null, ton = old ? old.ton : null;
+      if (srcv === "form") {
+        const D = saved._draft || {}; ton = parseNum(D.ton);
+        items = (D.lines || []).map(l => ({name: l.n, point: l.p, conc: parseNum(l.c), ml: parseNum(l.ml), s: parseNum(l.s)})).filter(i => i.conc > 0 && i.ml > 0 && i.s > 0);
+      } else if (srcv !== "keep") {
+        const s = saved._log.find(x => x.id === srcv);
+        if (s) { ton = s.ton; items = s.items.map(i => ({name: i.name, point: i.point || "", conc: i.conc, ml: i.ml, s: i.s})); }
+      }
+      if (!items || !items.length) return say("rc-msg", "bad", tr(LR.needLines));
+      if (!(ton > 0)) return say("rc-msg", "bad", tr(LR.needTon));
+      const f = {name, block: $("rc-block").value.trim(), sector: $("rc-sector").value.trim(), note: $("rc-note").value.trim(), ton, items};
+      if (old) { Object.assign(old, f, {edited: nowStamp()}); markDirty(old.id); }
+      else { const e = {id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), type: "recipe", date: today(), time: nowTime(), ...f}; saved._log.push(e); markDirty(e.id); }
+      persist(); sync(); editId = null; all(true); say("rc-msg", "good", tr(LR.saved));
+    });
+    $("rc-key").addEventListener("change", drawArch);
+    redrawRecipes = full => { if (full) editId = null; all(full); };
+    all(true);
+  }
   // ---------- Charts tab ----------
   const LC = {
     build: ["Qrafik qur", "Build a chart"], x: ["X oxu", "X axis"], timeOpt: ["Vaxt", "Time"], period: ["Dövr", "Period"], allTime: ["Bütün qeydlər", "All entries"],
@@ -1585,7 +1804,7 @@ if (typeof document !== "undefined") {
       const vars = chartVars(saved._log);
       if (cfg.x !== "time" && !vars.some(v => v.k === cfg.x)) cfg.x = "time";
       $("ch-x").innerHTML = `<option value="time"${cfg.x === "time" ? " selected" : ""}>${tr(LC.timeOpt)}</option>` + vars.map(v => `<option value="${esc(v.k)}"${v.k === cfg.x ? " selected" : ""}>${esc(tr(v.label))}</option>`).join("");
-      const dates = [...new Set(saved._log.filter(e => e.type !== "chart").map(e => e.date))].sort().reverse();
+      const dates = [...new Set(saved._log.filter(e => e.type !== "chart" && e.type !== "recipe").map(e => e.date))].sort().reverse();
       if (cfg.period && !dates.includes(cfg.period)) cfg.period = "";
       $("ch-period").innerHTML = `<option value="">${tr(LC.allTime)}</option>` + dates.map(d => `<option${d === cfg.period ? " selected" : ""}>${esc(d)}</option>`).join("");
       $("ch-ys").innerHTML = vars.filter(v => v.k !== cfg.x).map(v => `<button type="button" class="pick" data-y="${esc(v.k)}" aria-pressed="${cfg.ys.includes(v.k)}">${esc(tr(v.label))}</button>`).join("");
@@ -1609,7 +1828,7 @@ if (typeof document !== "undefined") {
     function refresh() {
       controls();
       spec = chartSpec(saved._log, cfg); hover = null; tip.hidden = true;
-      const hasLog = saved._log.some(e => e.type !== "chart"), ok = spec.panels.length > 0;
+      const hasLog = saved._log.some(e => e.type !== "chart" && e.type !== "recipe"), ok = spec.panels.length > 0;
       $("ch-empty").innerHTML = ok ? "" : `<p class="note">${tr(hasLog ? LC.pickY : LC.noLog)}</p>`;
       ["ch-wrap", "ch-note", "ch-det", "ch-save"].forEach(id => { $(id).hidden = !ok; });
       if (ok) {
@@ -1749,7 +1968,7 @@ if (typeof document !== "undefined") {
           <div class="panel" id="${m.id}-body"></div>
           <div class="box formulas"><h3>${tr(UI.formulas)}</h3><ul>${m.formulas.map(f => `<li>${tr(f)}</li>`).join("")}</ul></div>`;
         panels.appendChild(sec);
-        (m.id === "qrafik" ? renderCharts : renderLog)(document.getElementById(m.id + "-body"));
+        ({qrafik: renderCharts, resept: renderRecipes}[m.id] || renderLog)(document.getElementById(m.id + "-body"));
         return;
       }
       sec.innerHTML = `
@@ -1815,6 +2034,8 @@ if (typeof document !== "undefined") {
     current = id; saved._tab = id; persist();
     if (id === "jurnal") loadPdf().catch(() => {});
     if (id === "qrafik" && redrawCharts) redrawCharts();
+    if (id === "resept" && redrawRecipes) redrawRecipes(true);
+    if (id === "jurnal" && refreshJr) refreshJr();
     MODS.forEach(m => {
       document.getElementById("panel-" + m.id).hidden = m.id !== id;
       document.getElementById("tab-" + m.id).setAttribute("aria-selected", String(m.id === id));
