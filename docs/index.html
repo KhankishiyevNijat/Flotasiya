@@ -34,6 +34,7 @@ img { max-width: 100%; }
   --good: #1a7f4b;
   --warn: #a85a06;
   --bad: #b42318;
+  --viz: #2a78d6; --viz-grid: #e1e0d9; --viz-axis: #c3c2b7;
   --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
   --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
 }
@@ -41,13 +42,13 @@ img { max-width: 100%; }
   :root:not([data-theme="light"]) {
     --bg: #0f1513; --surface: #171f1c; --sunken: #1f2a26; --fg: #e5ecea; --muted: #93a39e;
     --line: #2b3733; --accent: #4fc3a6; --accent-fg: #06231c; --accent-soft: #173a31;
-    --good: #5fcf8e; --warn: #f0a54a; --bad: #f2766b; color-scheme: dark;
+    --good: #5fcf8e; --warn: #f0a54a; --bad: #f2766b; --viz: #3987e5; --viz-grid: #2c2c2a; --viz-axis: #383835; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0f1513; --surface: #171f1c; --sunken: #1f2a26; --fg: #e5ecea; --muted: #93a39e;
   --line: #2b3733; --accent: #4fc3a6; --accent-fg: #06231c; --accent-soft: #173a31;
-  --good: #5fcf8e; --warn: #f0a54a; --bad: #f2766b; color-scheme: dark;
+  --good: #5fcf8e; --warn: #f0a54a; --bad: #f2766b; --viz: #3987e5; --viz-grid: #2c2c2a; --viz-axis: #383835; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body {
@@ -186,6 +187,24 @@ select.plain { padding: 8px 6px; }
 .bubbles i { position: absolute; bottom: -26px; border-radius: 50%; border: 1.5px solid var(--accent); opacity: 0; animation: rise linear infinite; }
 @keyframes rise { 0% { transform: translateY(0) scale(.6); opacity: 0; } 15% { opacity: .32; } 100% { transform: translateY(-240px) scale(1.15); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .bubbles { display: none; } .ring-fg { transition: none; } }
+.pick {
+  font: 500 13.5px var(--font-body); color: var(--fg); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer;
+}
+.pick[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.chartwrap { position: relative; min-width: 0; }
+.chartwrap canvas { display: block; width: 100%; touch-action: pan-y; }
+.tip {
+  position: absolute; z-index: 5; pointer-events: none; min-width: 150px; max-width: 250px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+  font-size: 13px; box-shadow: 0 4px 14px rgba(0, 0, 0, .14);
+}
+.tip .th { color: var(--muted); font-size: 12px; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+.tip .tr { display: flex; gap: 8px; align-items: baseline; }
+.tip .tr b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tip .k { width: 12px; height: 2px; background: var(--viz); align-self: center; flex: 0 0 auto; }
+.tip .tl { color: var(--muted); }
+details summary { cursor: pointer; font-weight: 500; font-size: 14px; }
 .hint { color: var(--muted); font-size: 12.5px; margin: 0; }
 .entry { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .entry-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; }
@@ -680,6 +699,18 @@ const MODS = [
     ["Recovery = (Feed Cu − Tail Cu) / Feed Cu × 100. Ən son feed və rougher tail Cu nəticəsindən hesablanır.", "Recovery = (Feed Cu − Tail Cu) / Feed Cu × 100. Calculated from the latest feed and rougher tail Cu result."],
     ["100 %-li maye reagentlərdə (MIBC və s.) nəticə əslində ml/t-dur. Qram almaq üçün sıxlığa vurmaq lazımdır.", "For 100 % liquid reagents (MIBC etc.) the result is really mL/t. Multiply by the density to get grams."]
   ]
+},
+{
+  id: "qrafik", name: ["Qrafik", "Charts"], title: ["Jurnal qrafikləri", "Log charts"], custom: true,
+  intro: ["Jurnaldakı göstəricilərdən qrafik qurun: X oxuna vaxtı və ya istənilən göstəricini, Y oxuna bir və ya bir neçə göstəricini seçin. Hesabata əlavə etdiyiniz qrafik PDF hesabatda çıxır.",
+          "Build charts from the log: put time or any variable on the X axis and one or several variables on the Y axis. A chart you add to the report appears in the PDF report."],
+  inputs: [],
+  formulas: [
+    ["Hər Y göstəricisi öz panelində və öz şkalası ilə çəkilir, bütün panellər eyni X oxunu bölüşür. Fərqli ölçülü göstəricilər (məsələn pH və q/t) bir şkalaya salınmır ki, yalançı əlaqə görünməsin.", "Each Y variable is drawn in its own panel with its own scale, and all panels share the same X axis. Variables of different size (for example pH and g/t) are not forced onto one scale, so no false relationship appears."],
+    ["Reagent cəmi: həmin reagentin bütün nöqtələrə verilən dozalarının cəmi (q/t).", "Reagent total: the sum of that reagent's doses to all points (g/t)."],
+    ["Recovery = (Feed Cu − Tail Cu) / Feed Cu × 100", "Recovery = (Feed Cu − Tail Cu) / Feed Cu × 100"],
+    ["X oxu vaxt deyilsə, hər nöqtədə X və Y həmin ana qədər yazılmış son dəyərlərdir. r Pearson korrelyasiya əmsalıdır; əlaqəni göstərir, səbəbi yox.", "When the X axis is not time, X and Y at each point are the latest values recorded up to that moment. r is the Pearson correlation coefficient; it shows association, not cause."]
+  ]
 }
 ];
 
@@ -749,7 +780,7 @@ function migrateLog(log) {
     if (!e || typeof e !== "object") return;
     // A setting with no reagent lines is a leftover of a pH reading that an earlier version mangled on reload.
     if (e.type === "set" && !(e.items || []).length) return;
-    if (e.type === "set" || e.type === "res" || e.type === "ph") { out.push(e); return; }
+    if (e.type === "set" || e.type === "res" || e.type === "ph" || e.type === "chart") { out.push(e); return; }
     out.push({id: e.id, type: "set", date: e.date, time: e.time, ton: e.ton, note: e.note || "", items: (e.items || []).map(i => ({point: "", ...i}))});
     if (e.feed || e.tail || e.fconc) out.push({id: e.id + "r", type: "res", date: e.date, time: e.time, feed: e.feed || "", tail: e.tail || "", fconc: e.fconc || ""});
   });
@@ -803,6 +834,170 @@ function reportText(log) {
   return L.join("\n");
 }
 
+// ---------- Charts: variables, series and drawing (shared by the screen and the PDF) ----------
+const VARS = [
+  {k: "rec", label: ["Recovery", "Recovery"], unit: "%", d: 1},
+  {k: "feed", label: ["Flotasiya feed Cu", "Flotation feed Cu"], unit: "%", d: 2},
+  {k: "tail", label: ["Rougher tail Cu", "Rougher tail Cu"], unit: "%", d: 3},
+  {k: "fconc", label: ["Final cleaner conc. Cu", "Final cleaner conc. Cu"], unit: "%", d: 1},
+  {k: "ph", label: ["pH", "pH"], unit: "", d: 1},
+  {k: "sol", label: ["Feed bərk faza", "Feed solids"], unit: "%", d: 1}
+];
+const pad2 = n => String(n).padStart(2, "0");
+const tms = e => new Date(`${e.date}T${e.time}`).getTime();
+const hhmm = t => { const d = new Date(t); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const ddmm = t => { const d = new Date(t); return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}`; };
+// The fixed variables plus one "total g/t" variable for every reagent that appears in the log.
+function chartVars(log) {
+  const names = REAGENTS.map(r => r[0]).filter(n => log.some(e => e.type === "set" && (e.items || []).some(i => i.name === n)));
+  return [...VARS, ...names.map(n => ({k: "rg:" + n, label: [`${n} cəmi`, `${n} total`], unit: U.gpt, d: 2, step: true}))];
+}
+function seriesOf(log, k) {
+  let pts;
+  if (k.startsWith("rg:")) {
+    const n = k.slice(3);
+    pts = log.filter(e => e.type === "set").map(e => ({t: tms(e), v: (e.items || []).filter(i => i.name === n).reduce((a, i) => a + i.dose, 0)}));
+  } else if (k === "rec") {
+    pts = log.filter(e => e.type === "res").map(e => ({t: tms(e), f: parseNum(e.feed), tl: parseNum(e.tail)}))
+      .filter(x => x.f > 0 && x.tl >= 0).map(x => ({t: x.t, v: (x.f - x.tl) / x.f * 100}));
+  } else {
+    pts = log.filter(e => e.type === "res" || e.type === "ph").map(e => ({t: tms(e), v: parseNum(e[k] ?? "")}));
+  }
+  return pts.filter(p => isFinite(p.t) && isFinite(p.v)).sort((a, b) => a.t - b.t);
+}
+const lastAt = (s, t) => { let v = null; for (const p of s) { if (p.t <= t) v = p.v; else break; } return v; };
+// X against Y: take the latest known value of both at each anchor time. A reagent total only
+// changes with the setting, so against a measured value the anchors are the measurements;
+// otherwise a new setting would be paired with a result obtained under the old one.
+function pairUp(sx, sy, xStep, yStep) {
+  const out = [], anchors = xStep && !yStep ? sy : yStep && !xStep ? sx : [...sx, ...sy];
+  [...new Set(anchors.map(p => p.t))].sort((a, b) => a - b).forEach(t => {
+    const x = lastAt(sx, t), y = lastAt(sy, t), l = out[out.length - 1];
+    if (x != null && y != null && !(l && l.x === x && l.y === y)) out.push({t, x, y});
+  });
+  return out;
+}
+function pearson(ps) {
+  const n = ps.length; if (n < 3) return null;
+  const mx = ps.reduce((a, p) => a + p.x, 0) / n, my = ps.reduce((a, p) => a + p.y, 0) / n;
+  let sxx = 0, syy = 0, sxy = 0;
+  ps.forEach(p => { sxx += (p.x - mx) ** 2; syy += (p.y - my) ** 2; sxy += (p.x - mx) * (p.y - my); });
+  if (!(sxx > 0 && syy > 0)) return null;
+  return {r: sxy / Math.sqrt(sxx * syy), m: sxy / sxx, b: my - sxy / sxx * mx};
+}
+function chartSpec(log, cfg) {
+  const vars = chartVars(log), V = k => vars.find(v => v.k === k);
+  const w = cfg.period ? [new Date(cfg.period + "T00:00").getTime(), new Date(cfg.period + "T23:59:59").getTime()] : null;
+  const inW = t => !w || (t >= w[0] && t <= w[1]);
+  const time = !V(cfg.x);
+  const sx = time ? null : seriesOf(log, cfg.x);
+  const panels = (cfg.ys || []).filter(k => V(k) && (time || k !== cfg.x)).map(k => {
+    const v = V(k), s = seriesOf(log, k);
+    let pts;
+    if (time) {
+      pts = s.filter(p => inW(p.t)).map(p => ({x: p.t, y: p.v, t: p.t}));
+      if (v.step && w) { const v0 = lastAt(s, w[0]); if (v0 != null && !(pts[0] && pts[0].x === w[0])) pts.unshift({x: w[0], y: v0, t: w[0]}); }
+    } else pts = pairUp(sx, s, !!V(cfg.x).step, !!v.step).filter(p => inW(p.t));
+    return {k, v, pts, step: time && !!v.step, fit: time ? null : pearson(pts)};
+  });
+  return {time, xVar: time ? null : V(cfg.x), panels};
+}
+function chartName(log, cfg, lang) {
+  const spec = chartSpec(log, cfg), L = x => Array.isArray(x) ? x[lang] : x;
+  const ys = spec.panels.map(p => L(p.v.label)).join(", ");
+  return spec.time ? `${ys} ${lang ? "over time" : "vaxta görə"}` : `${ys} ${lang ? "against" : "↔"} ${L(spec.xVar.label)}`;
+}
+const CH = {PH: 126, GAP: 14, ML: 50, MR: 18, TOP: 24, AX: 30};
+const chartHeight = spec => spec.panels.length * CH.PH + (spec.panels.length - 1) * CH.GAP + CH.AX + (spec.time ? 0 : 18);
+function niceScale(lo, hi, n) {
+  if (!(hi > lo)) { const p = Math.abs(lo) * 0.05 || 1; lo -= p; hi += p; }
+  const raw = (hi - lo) / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
+  const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * mag;
+  const a = Math.floor(lo / step + 1e-9) * step, b = Math.ceil(hi / step - 1e-9) * step, ticks = [];
+  for (let i = 0; a + i * step <= b + step * 1e-6; i++) ticks.push(a + i * step);
+  return {lo: a, hi: b, ticks, step};
+}
+const tickText = (v, step) => v.toFixed(Math.max(0, Math.min(4, -Math.floor(Math.log10(step) + 1e-9))));
+function timeTicks(lo, hi, max) {
+  const steps = [5, 10, 15, 30, 60, 120, 180, 360, 720, 1440, 2880, 10080].map(m => m * 60000);
+  const step = steps.find(s => (hi - lo) / s <= max) || steps[steps.length - 1];
+  const d0 = new Date(lo); d0.setHours(0, 0, 0, 0);
+  const base = d0.getTime(), out = [];
+  for (let t = base + Math.ceil((lo - base) / step) * step; t <= hi; t += step) out.push(t);
+  return out;
+}
+// Draws stacked panels (one per Y variable, each with its own scale) on one shared X axis.
+function drawChart(ctx, W, spec, th, lang, hover) {
+  const L = x => Array.isArray(x) ? x[lang] : x, F = "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif";
+  const x0 = CH.ML, x1 = W - CH.MR, all = spec.panels.flatMap(p => p.pts);
+  const line = (a, b, c, d) => { ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke(); };
+  const dot = (x, y, r, fill) => { ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+  ctx.fillStyle = th.surface; ctx.fillRect(0, 0, W, chartHeight(spec));
+  let xlo = Math.min(...all.map(p => p.x)), xhi = Math.max(...all.map(p => p.x)), xt = [], xstep = 1;
+  const narrow = W < 480;
+  if (!all.length) { xlo = 0; xhi = 1; }
+  else if (spec.time) {
+    if (xhi === xlo) { xlo -= 30 * 60000; xhi += 30 * 60000; } else { const p = (xhi - xlo) * 0.03; xlo -= p; xhi += p; }
+    xt = timeTicks(xlo, xhi, narrow ? 4 : 7);
+  } else { const s = niceScale(xlo, xhi, narrow ? 4 : 6); xlo = s.lo; xhi = s.hi; xt = s.ticks; xstep = s.step; }
+  const sx = v => x0 + (v - xlo) / (xhi - xlo) * (x1 - x0);
+  const multiDay = spec.time && new Date(xlo).toDateString() !== new Date(xhi).toDateString();
+  const geo = spec.panels.map((p, i) => {
+    const top = i * (CH.PH + CH.GAP), y0 = top + CH.TOP, y1 = top + CH.PH, u = L(p.v.unit);
+    ctx.textBaseline = "alphabetic"; ctx.textAlign = "left"; ctx.font = `600 12px ${F}`; ctx.fillStyle = th.fg;
+    ctx.fillText(L(p.v.label) + (u ? `, ${u}` : ""), 2, top + 12);
+    ctx.textAlign = "right"; ctx.font = `500 12px ${F}`; ctx.fillStyle = th.muted;
+    const info = !p.pts.length ? "" : spec.time ? `${lang ? "last" : "son"}: ${p.pts[p.pts.length - 1].y.toFixed(p.v.d)}`
+      : `${p.fit ? `r = ${p.fit.r.toFixed(2)} · ` : ""}n = ${p.pts.length}`;
+    ctx.fillText(info, x1, top + 12);
+    ctx.lineWidth = 1; ctx.strokeStyle = th.axis; line(x0, y1 + .5, x1, y1 + .5);
+    if (!p.pts.length) { ctx.textAlign = "center"; ctx.fillStyle = th.muted; ctx.fillText(lang ? "No data" : "Məlumat yoxdur", (x0 + x1) / 2, (y0 + y1) / 2); return null; }
+    const ys = p.pts.map(q => q.y), s = niceScale(Math.min(...ys), Math.max(...ys), 3);
+    const sy = v => y1 - (v - s.lo) / (s.hi - s.lo) * (y1 - y0);
+    ctx.font = `11px ${F}`; ctx.textBaseline = "middle";
+    s.ticks.forEach(t => { const y = Math.round(sy(t)) + .5; if (t > s.lo) { ctx.strokeStyle = th.grid; line(x0, y, x1, y); } ctx.fillStyle = th.muted; ctx.textAlign = "right"; ctx.fillText(tickText(t, s.step), x0 - 6, y); });
+    xt.forEach(t => { const x = Math.round(sx(t)) + .5; ctx.strokeStyle = th.grid; line(x, y0, x, y1); });
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    if (spec.time) {
+      ctx.strokeStyle = th.series; ctx.lineWidth = 2; ctx.beginPath();
+      p.pts.forEach((q, j) => { const X = sx(q.x), Y = sy(q.y); if (!j) ctx.moveTo(X, Y); else { if (p.step) ctx.lineTo(X, sy(p.pts[j - 1].y)); ctx.lineTo(X, Y); } });
+      if (p.step) ctx.lineTo(x1, sy(p.pts[p.pts.length - 1].y));
+      ctx.stroke();
+    } else if (p.fit) {
+      ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+      ctx.strokeStyle = th.muted; ctx.lineWidth = 1; line(x0, sy(p.fit.m * xlo + p.fit.b), x1, sy(p.fit.m * xhi + p.fit.b)); ctx.restore();
+    }
+    p.pts.forEach(q => { dot(sx(q.x), sy(q.y), 6, th.surface); dot(sx(q.x), sy(q.y), 4, th.series); });
+    return {y0, y1, sy, top};
+  });
+  const base = spec.panels.length * (CH.PH + CH.GAP) - CH.GAP;
+  ctx.font = `11px ${F}`; ctx.fillStyle = th.muted; ctx.textBaseline = "top"; ctx.textAlign = "center";
+  let lastR = -1e9;
+  xt.forEach(t => {
+    const txt = spec.time ? (multiDay ? `${ddmm(t)} ${hhmm(t)}` : hhmm(t)) : tickText(t, xstep), hw = ctx.measureText(txt).width / 2;
+    const x = Math.min(Math.max(sx(t), hw + 2), W - hw - 2);
+    if (x - hw < lastR + 8) return;
+    ctx.fillText(txt, x, base + 8); lastR = x + hw;
+  });
+  if (!spec.time) { const u = L(spec.xVar.unit); ctx.font = `600 12px ${F}`; ctx.fillStyle = th.fg; ctx.fillText(L(spec.xVar.label) + (u ? `, ${u}` : ""), (x0 + x1) / 2, base + 28); }
+  if (hover) {
+    if (spec.time) {
+      const X = Math.round(sx(hover.t)) + .5;
+      geo.forEach((g, i) => {
+        if (!g) return;
+        ctx.strokeStyle = th.muted; ctx.lineWidth = 1; line(X, g.y0, X, g.y1);
+        const v = lastAt(spec.panels[i].pts.map(q => ({t: q.x, v: q.y})), hover.t);
+        if (v != null) { dot(X, g.sy(v), 8, th.surface); dot(X, g.sy(v), 5.5, th.series); }
+      });
+    } else {
+      const g = geo[hover.i], q = g && spec.panels[hover.i].pts[hover.j];
+      if (q) { dot(sx(q.x), g.sy(q.y), 9, th.surface); dot(sx(q.x), g.sy(q.y), 6.5, th.series); }
+    }
+  }
+  return {geo, sx};
+}
+const PDF_THEME = {surface: "#ffffff", fg: "#16201d", muted: "#586863", grid: "#e1e0d9", axis: "#c3c2b7", series: "#2a78d6"};
+
 function fmt(x, d) {
   if (!isFinite(x)) return "–";
   const s = x.toFixed(d), parts = s.split(".");
@@ -846,7 +1041,7 @@ if (typeof document !== "undefined") {
     return pdfLoading;
   }
   function makePdf(log, fonts) {
-    const doc = new window.jspdf.jsPDF({unit: "mm", format: "a4"});
+    const doc = new window.jspdf.jsPDF({unit: "mm", format: "a4", compress: true});
     doc.addFileToVFS("rep.ttf", fonts[0]); doc.addFont("rep.ttf", "rep", "normal");
     doc.addFileToVFS("repb.ttf", fonts[1]); doc.addFont("repb.ttf", "rep", "bold");
     const {sets, results} = splitLog(log);
@@ -884,6 +1079,25 @@ if (typeof document !== "undefined") {
       const rows = tableRows(results, keys);
       if (!rows.length) rows.push([{content: none, colSpan: cols.length}]);
       doc.autoTable({startY: y + 3, head: [cols], body: rows, theme: "grid", styles: style, headStyles: head, margin: {left: 14, right: 14}, columnStyles});
+    });
+
+    // Charts the user added to the report, drawn with the data as it stands now.
+    const charts = log.filter(e => e.type === "chart").sort((a, b) => stamp(a).localeCompare(stamp(b)));
+    let cy = doc.lastAutoTable.finalY + 11, first = true;
+    charts.forEach(c => {
+      const spec = chartSpec(log, c);
+      if (!spec.panels.some(p => p.pts.length)) return;
+      const W = 760, H = chartHeight(spec), k = 2, wmm = 182, hmm = wmm * H / W;
+      const cv = document.createElement("canvas"); cv.width = W * k; cv.height = H * k;
+      const ctx = cv.getContext("2d"); ctx.scale(k, k);
+      drawChart(ctx, W, spec, PDF_THEME, 1, null);
+      if (first || cy + hmm + 18 > 284) { if (first && cy + hmm + 26 <= 284) { title("Charts", cy); cy += 8; } else { doc.addPage(); cy = 20; if (first) { title("Charts", cy); cy += 8; } } first = false; }
+      doc.setFont("rep", "bold"); doc.setFontSize(9.5); doc.setTextColor(20);
+      doc.text(chartName(log, c, 1) + (c.period ? `  (${c.period})` : ""), 14, cy);
+      doc.addImage(cv.toDataURL("image/png"), "PNG", 14, cy + 3, wmm, hmm, undefined, "FAST");
+      cy += hmm + 6;
+      if (!spec.time) { doc.setFont("rep", "normal"); doc.setFontSize(7.5); doc.setTextColor(110); doc.text("At each point X and Y are the latest values recorded up to that moment. r is the Pearson correlation coefficient.", 14, cy); cy += 4; }
+      cy += 8;
     });
 
     const n = doc.getNumberOfPages();
@@ -940,6 +1154,7 @@ if (typeof document !== "undefined") {
       saved._log = [...remote.filter(e => !d2.has(e.id)), ...saved._log.filter(e => d2.has(e.id))];
       saved._syncAt = Date.now(); persist();
       setCloud("ok"); if (onCloudChange) onCloudChange();
+      if (redrawCharts && current === "qrafik") redrawCharts();
     } catch (e) {
       if (e.badCode) { saved._code = ""; persist(); }
       setCloud(e.badCode ? "code" : "off");
@@ -1318,6 +1533,197 @@ if (typeof document !== "undefined") {
     });
   }
 
+  // ---------- Charts tab ----------
+  const LC = {
+    build: ["Qrafik qur", "Build a chart"], x: ["X oxu", "X axis"], timeOpt: ["Vaxt", "Time"], period: ["Dövr", "Period"], allTime: ["Bütün qeydlər", "All entries"],
+    y: ["Y oxu (bir və ya bir neçəsini seçin)", "Y axis (pick one or several)"],
+    pickY: ["Y oxu üçün ən azı bir göstərici seçin.", "Pick at least one variable for the Y axis."],
+    noLog: ["Jurnalda hələ məlumat yoxdur. Əvvəlcə «Reagent jurnalı» tabında ayar və nəticə yazın.", "There is no data in the log yet. Save a setting and results in the “Reagent log” tab first."],
+    max: ["Bir qrafikdə ən çox 6 göstərici ola bilər.", "A chart can hold at most 6 variables."],
+    noteTime: ["Hər göstərici öz panelində və öz şkalası ilə çəkilir, vaxt oxu ortaqdır. Reagent cəmi ayar dəyişənə qədər sabit qalır.", "Each variable is drawn in its own panel with its own scale; the time axis is shared. A reagent total stays flat until the setting changes."],
+    noteXY: ["Hər nöqtədə X və Y həmin ana qədər yazılmış son dəyərlərdir. r korrelyasiya əmsalıdır (+1 və −1 güclü əlaqə, 0 əlaqə yoxdur); az nöqtə ilə etibarsızdır.", "At each point X and Y are the latest values recorded up to that moment. r is the correlation coefficient (+1 and −1 strong, 0 none); it is unreliable with few points."],
+    table: ["Cədvəl", "Table"], tTime: ["Vaxt", "Time"],
+    save: ["Qrafiki hesabata əlavə et", "Add chart to the report"], saved: ["Qrafik hesabata əlavə olundu. PDF hesabatda görünəcək.", "Chart added to the report. It will appear in the PDF report."],
+    dup: ["Bu qrafik artıq hesabata əlavə olunub.", "This chart is already in the report."],
+    savedBox: ["Hesabata əlavə olunmuş qrafiklər", "Charts in the report"],
+    noneSaved: ["Hələ qrafik əlavə olunmayıb. Yuxarıda qrafik qurub «Qrafiki hesabata əlavə et» basın.", "No charts added yet. Build a chart above and press “Add chart to the report”."],
+    show: ["Göstər", "Show"], chartAria: ["Qrafik", "Chart"]
+  };
+  let redrawCharts = null;
+  function renderCharts(root) {
+    saved._log = migrateLog(saved._log);
+    if (!saved._chartCfg || typeof saved._chartCfg !== "object") saved._chartCfg = {x: "time", ys: ["rec", "ph"], period: ""};
+    const cfg = saved._chartCfg; if (!Array.isArray(cfg.ys)) cfg.ys = [];
+    root.innerHTML = `
+      <div class="box stack">
+        <h3 style="margin:0">${tr(LC.build)}</h3>
+        <div class="fields g3 dt2">
+          <div class="field"><label for="ch-x">${tr(LC.x)}</label><select class="plain" id="ch-x"></select></div>
+          <div class="field"><label for="ch-period">${tr(LC.period)}</label><select class="plain" id="ch-period"></select></div>
+        </div>
+        <div class="field"><label id="ch-ylab">${tr(LC.y)}</label><div class="chips" id="ch-ys" role="group" aria-labelledby="ch-ylab"></div></div>
+      </div>
+      <div class="box stack">
+        <div id="ch-empty" aria-live="polite"></div>
+        <div class="chartwrap" id="ch-wrap"><canvas id="ch-cv" tabindex="0" role="img"></canvas><div class="tip" id="ch-tip" hidden></div></div>
+        <p class="hint" id="ch-note"></p>
+        <details id="ch-det"><summary>${tr(LC.table)}</summary><div class="tablewrap" id="ch-table"></div></details>
+        <div class="btnrow"><button type="button" class="btn primary" id="ch-save">${tr(LC.save)}</button></div>
+        <div id="ch-msg" aria-live="polite"></div>
+      </div>
+      <div class="box stack">
+        <h3 style="margin:0">${tr(LC.savedBox)}</h3>
+        <div class="stack" id="ch-saved" style="gap:8px"></div>
+      </div>`;
+    const $ = id => document.getElementById(id);
+    const say = (el, st, text) => { $(el).innerHTML = text ? `<div class="msg ${st}">${text}</div>` : ""; };
+    const cv = $("ch-cv"), tip = $("ch-tip");
+    let spec = null, lay = null, hover = null, times = [];
+    const theme = () => { const c = getComputedStyle(document.documentElement), g = n => c.getPropertyValue(n).trim(); return {surface: g("--surface"), fg: g("--fg"), muted: g("--muted"), grid: g("--viz-grid"), axis: g("--viz-axis"), series: g("--viz")}; };
+
+    function controls() {
+      const vars = chartVars(saved._log);
+      if (cfg.x !== "time" && !vars.some(v => v.k === cfg.x)) cfg.x = "time";
+      $("ch-x").innerHTML = `<option value="time"${cfg.x === "time" ? " selected" : ""}>${tr(LC.timeOpt)}</option>` + vars.map(v => `<option value="${esc(v.k)}"${v.k === cfg.x ? " selected" : ""}>${esc(tr(v.label))}</option>`).join("");
+      const dates = [...new Set(saved._log.filter(e => e.type !== "chart").map(e => e.date))].sort().reverse();
+      if (cfg.period && !dates.includes(cfg.period)) cfg.period = "";
+      $("ch-period").innerHTML = `<option value="">${tr(LC.allTime)}</option>` + dates.map(d => `<option${d === cfg.period ? " selected" : ""}>${esc(d)}</option>`).join("");
+      $("ch-ys").innerHTML = vars.filter(v => v.k !== cfg.x).map(v => `<button type="button" class="pick" data-y="${esc(v.k)}" aria-pressed="${cfg.ys.includes(v.k)}">${esc(tr(v.label))}</button>`).join("");
+    }
+    function draw() {
+      const W = $("ch-wrap").clientWidth; if (!W || !spec || !spec.panels.length) return;
+      const H = chartHeight(spec), dpr = Math.max(1, window.devicePixelRatio || 1);
+      if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + "px"; }
+      const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      lay = drawChart(ctx, W, spec, theme(), LANG, hover);
+    }
+    function table() {
+      const ts = [...new Set(spec.panels.flatMap(p => p.pts.map(q => q.t)))].sort((a, b) => a - b);
+      const head = [tr(LC.tTime), ...(spec.time ? [] : [tr(spec.xVar.label)]), ...spec.panels.map(p => tr(p.v.label))];
+      const rows = ts.map(t => {
+        const xq = spec.time ? null : spec.panels.map(p => p.pts.find(q => q.t === t)).find(Boolean);
+        return [`${ddmm(t)} ${hhmm(t)}`, ...(spec.time ? [] : [xq ? xq.x.toFixed(spec.xVar.d) : ""]), ...spec.panels.map(p => { const q = p.pts.find(q => q.t === t); return q ? q.y.toFixed(p.v.d) : ""; })];
+      });
+      $("ch-table").innerHTML = `<table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    }
+    function refresh() {
+      controls();
+      spec = chartSpec(saved._log, cfg); hover = null; tip.hidden = true;
+      const hasLog = saved._log.some(e => e.type !== "chart"), ok = spec.panels.length > 0;
+      $("ch-empty").innerHTML = ok ? "" : `<p class="note">${tr(hasLog ? LC.pickY : LC.noLog)}</p>`;
+      ["ch-wrap", "ch-note", "ch-det", "ch-save"].forEach(id => { $(id).hidden = !ok; });
+      if (ok) {
+        times = [...new Set(spec.panels.flatMap(p => p.pts.map(q => q.x)))].sort((a, b) => a - b);
+        $("ch-note").textContent = tr(spec.time ? LC.noteTime : LC.noteXY);
+        cv.setAttribute("aria-label", `${tr(LC.chartAria)}: ${chartName(saved._log, cfg, LANG)}`);
+        table(); draw();
+      }
+      savedList();
+    }
+    function savedList() {
+      const cs = saved._log.filter(e => e.type === "chart").sort((a, b) => stamp(a).localeCompare(stamp(b)));
+      $("ch-saved").innerHTML = cs.length ? cs.map(c => `<div class="resrow" style="border-top:0;padding-top:0">
+          <span class="t">${esc(chartName(saved._log, c, LANG) || "–")}</span><span class="note">${esc(c.period || tr(LC.allTime))}</span><span class="sp"></span>
+          <button type="button" class="btn small" data-show="${esc(c.id)}">${tr(LC.show)}</button><button type="button" class="btn small danger" data-del="${esc(c.id)}">${tr(LG.del)}</button>
+        </div>`).join("") : `<p class="note">${tr(LC.noneSaved)}</p>`;
+    }
+    const keepCfg = () => { persist(); refresh(); };
+    $("ch-x").addEventListener("change", e => { cfg.x = e.target.value; say("ch-msg", "", ""); keepCfg(); });
+    $("ch-period").addEventListener("change", e => { cfg.period = e.target.value; say("ch-msg", "", ""); keepCfg(); });
+    $("ch-ys").addEventListener("click", e => {
+      const b = e.target.closest("[data-y]"); if (!b) return;
+      const k = b.dataset.y, on = cfg.ys.includes(k);
+      const shown = cfg.ys.filter(y => y !== cfg.x && chartVars(saved._log).some(v => v.k === y)).length;
+      if (!on && shown >= 6) return say("ch-msg", "warn", tr(LC.max));
+      cfg.ys = on ? cfg.ys.filter(y => y !== k) : [...cfg.ys, k];
+      say("ch-msg", "", ""); keepCfg();
+    });
+
+    // Hover / touch / keyboard readout
+    function showTip(px, py) {
+      tip.textContent = "";
+      const add = (cls, text) => { const d = document.createElement("div"); d.className = cls; d.textContent = text; tip.appendChild(d); return d; };
+      const row = (value, label) => { const r = document.createElement("div"); r.className = "tr"; const k = document.createElement("span"); k.className = "k"; const b = document.createElement("b"); b.textContent = value; const l = document.createElement("span"); l.className = "tl"; l.textContent = label; r.append(k, b, l); tip.appendChild(r); };
+      const unit = v => { const u = tr(v.unit); return u ? " " + u : ""; };
+      if (spec.time) {
+        add("th", `${ddmm(hover.t)} ${hhmm(hover.t)}`);
+        spec.panels.forEach(p => { const v = lastAt(p.pts.map(q => ({t: q.x, v: q.y})), hover.t); row(v == null ? "–" : v.toFixed(p.v.d) + unit(p.v), tr(p.v.label)); });
+      } else {
+        const p = spec.panels[hover.i], q = p.pts[hover.j];
+        add("th", `${ddmm(q.t)} ${hhmm(q.t)}`);
+        row(q.y.toFixed(p.v.d) + unit(p.v), tr(p.v.label));
+        row(q.x.toFixed(spec.xVar.d) + unit(spec.xVar), tr(spec.xVar.label));
+      }
+      tip.hidden = false;
+      const W = $("ch-wrap").clientWidth, tw = tip.offsetWidth, th = tip.offsetHeight;
+      tip.style.left = Math.max(0, Math.min(W - tw, px + 14 + tw > W ? px - tw - 14 : px + 14)) + "px";
+      tip.style.top = Math.max(0, Math.min(cv.clientHeight - th, py - th / 2)) + "px";
+    }
+    function point(ev) {
+      if (!spec || !lay) return;
+      const r = cv.getBoundingClientRect(), px = ev.clientX - r.left, py = ev.clientY - r.top;
+      if (spec.time) {
+        if (!times.length) return;
+        const t = times.reduce((a, b) => Math.abs(lay.sx(b) - px) < Math.abs(lay.sx(a) - px) ? b : a);
+        hover = {t}; draw(); showTip(lay.sx(t), py);
+      } else {
+        let i = lay.geo.findIndex(g => g && py >= g.top && py <= g.y1 + CH.GAP / 2);
+        if (i < 0) i = lay.geo.findIndex(Boolean);
+        if (i < 0) return;
+        const g = lay.geo[i], pts = spec.panels[i].pts;
+        let j = 0, best = Infinity;
+        pts.forEach((q, n) => { const d = (lay.sx(q.x) - px) ** 2 + (g.sy(q.y) - py) ** 2; if (d < best) { best = d; j = n; } });
+        hover = {i, j}; draw(); showTip(lay.sx(pts[j].x), g.sy(pts[j].y));
+      }
+    }
+    const clearHover = () => { hover = null; tip.hidden = true; draw(); };
+    cv.addEventListener("pointermove", point);
+    cv.addEventListener("pointerdown", point);
+    cv.addEventListener("pointerleave", ev => { if (ev.pointerType === "mouse") clearHover(); });
+    cv.addEventListener("blur", clearHover);
+    cv.addEventListener("keydown", ev => {
+      if (!spec || !lay) return;
+      if (ev.key === "Escape") return clearHover();
+      const step = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0; if (!step) return;
+      ev.preventDefault();
+      if (spec.time) {
+        if (!times.length) return;
+        const n = hover ? times.indexOf(hover.t) + step : (step > 0 ? 0 : times.length - 1), t = times[Math.max(0, Math.min(times.length - 1, n))];
+        hover = {t}; draw(); showTip(lay.sx(t), 20);
+      } else {
+        const i = hover ? hover.i : lay.geo.findIndex(Boolean); if (i < 0) return;
+        const pts = spec.panels[i].pts, j = Math.max(0, Math.min(pts.length - 1, hover ? hover.j + step : 0));
+        hover = {i, j}; draw(); showTip(lay.sx(pts[j].x), lay.geo[i].sy(pts[j].y));
+      }
+    });
+
+    $("ch-save").addEventListener("click", () => {
+      if (!spec || !spec.panels.length) return;
+      const ys = spec.panels.map(p => p.k), x = spec.time ? "time" : cfg.x, same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+      if (saved._log.some(e => e.type === "chart" && e.x === x && (e.period || "") === (cfg.period || "") && same(e.ys || [], ys))) return say("ch-msg", "warn", tr(LC.dup));
+      const e = {id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), type: "chart", date: today(), time: nowTime(), x, ys, period: cfg.period || ""};
+      saved._log.push(e); markDirty(e.id); persist(); savedList(); sync();
+      say("ch-msg", "good", `<b>${tr(UI.good)}</b>${tr(LC.saved)}`);
+    });
+    $("ch-saved").addEventListener("click", ev => {
+      const sh = ev.target.closest("[data-show]");
+      if (sh) {
+        const c = saved._log.find(x => x.id === sh.dataset.show); if (!c) return;
+        cfg.x = c.x; cfg.ys = (c.ys || []).slice(); cfg.period = c.period || ""; say("ch-msg", "", ""); keepCfg();
+        $("ch-wrap").scrollIntoView({behavior: "smooth", block: "nearest"});
+        return;
+      }
+      const b = ev.target.closest("[data-del]"); if (!b) return;
+      if (b.dataset.armed) { saved._log = saved._log.filter(x => x.id !== b.dataset.del); markGone([b.dataset.del]); persist(); savedList(); sync(); }
+      else { b.dataset.armed = "1"; b.textContent = tr(LG.delSure); }
+    });
+    redrawCharts = refresh;
+    refresh();
+  }
+  window.addEventListener("resize", () => { if (redrawCharts && current === "qrafik") redrawCharts(); });
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (redrawCharts) redrawCharts(); }); } catch (e) {}
+  new MutationObserver(() => { if (redrawCharts) redrawCharts(); }).observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme"]});
+
   function build() {
     document.documentElement.lang = LANG ? "en" : "az";
     document.getElementById("h1").textContent = tr(UI.h1);
@@ -1343,7 +1749,7 @@ if (typeof document !== "undefined") {
           <div class="panel" id="${m.id}-body"></div>
           <div class="box formulas"><h3>${tr(UI.formulas)}</h3><ul>${m.formulas.map(f => `<li>${tr(f)}</li>`).join("")}</ul></div>`;
         panels.appendChild(sec);
-        renderLog(document.getElementById(m.id + "-body"));
+        (m.id === "qrafik" ? renderCharts : renderLog)(document.getElementById(m.id + "-body"));
         return;
       }
       sec.innerHTML = `
@@ -1408,6 +1814,7 @@ if (typeof document !== "undefined") {
     if (!MODS.some(m => m.id === id)) id = MODS[0].id;
     current = id; saved._tab = id; persist();
     if (id === "jurnal") loadPdf().catch(() => {});
+    if (id === "qrafik" && redrawCharts) redrawCharts();
     MODS.forEach(m => {
       document.getElementById("panel-" + m.id).hidden = m.id !== id;
       document.getElementById("tab-" + m.id).setAttribute("aria-selected", String(m.id === id));
